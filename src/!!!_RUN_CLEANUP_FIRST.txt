@@ -1,0 +1,56 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║                                                                      ║
+║              ⚠️  IMPORTANT - READ THIS FIRST! ⚠️                     ║
+║                                                                      ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+🎯 BEFORE DOING ANYTHING:
+
+   Run the cleanup script ONCE to remove old web files!
+
+   Mac/Linux:        Windows:
+   ──────────        ────────
+   ./INSTANT_CLEANUP.sh      INSTANT_CLEANUP.bat
+
+   This takes 10 seconds and deletes old web components.
+
+📚 THEN READ:
+   
+   START_HERE_FIRST.md    ← Complete guide
+   IMPORT_INSTRUCTIONS.md ← Import to your codebase
+   ABSOLUTE_QUICKSTART.md ← Just 3 commands
+
+🚀 QUICK START:
+
+   1. Run cleanup script (above)
+   2. npm install
+   3. npx expo start
+   4. Scan QR code with Expo Go on iPhone
+   5. Done! 🎉
+
+✅ AFTER CLEANUP YOU GET:
+
+   - 100% clean React Native Expo project
+   - Zero web dependencies (no Vite, no Tailwind)
+   - ~25 essential files (vs 150 before)
+   - Production-ready iOS app
+   - Ready to import to VS Code
+
+⚠️  DON'T SKIP THE CLEANUP!
+
+   The app won't work without it. Old web files will cause errors.
+
+📖 FULL INSTRUCTIONS:
+
+   See START_HERE_FIRST.md for complete walkthrough
+
+🆘 NEED HELP?
+
+   - Setup help: IMPORT_INSTRUCTIONS.md
+   - VS Code: VSCODE_SETUP.md
+   - Troubleshooting: TROUBLESHOOTING.md
+   - All commands: EXPO_COMMANDS.md
+
+═══════════════════════════════════════════════════════════════════════
+
+Let's get started! Run INSTANT_CLEANUP first! 🧹✨

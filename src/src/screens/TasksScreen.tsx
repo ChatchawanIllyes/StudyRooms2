@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -6,9 +6,9 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../context/ThemeContext';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../context/ThemeContext";
 
 interface Task {
   id: string;
@@ -16,14 +16,18 @@ interface Task {
   completed: boolean;
 }
 
-export default function TasksScreen() {
+interface TasksScreenProps {
+  navigation?: any;
+}
+
+export default function TasksScreen({ navigation }: TasksScreenProps) {
   const { colors } = useTheme();
   const [tasks, setTasks] = useState<Task[]>([
-    { id: '1', text: 'Review calculus notes', completed: false },
-    { id: '2', text: 'Complete chemistry lab report', completed: true },
-    { id: '3', text: 'Read chapters 5-7 for history', completed: false },
+    { id: "1", text: "Review calculus notes", completed: false },
+    { id: "2", text: "Complete chemistry lab report", completed: true },
+    { id: "3", text: "Read chapters 5-7 for history", completed: false },
   ]);
-  const [newTaskText, setNewTaskText] = useState('');
+  const [newTaskText, setNewTaskText] = useState("");
 
   const toggleTask = (id: string) => {
     setTasks((prev) =>
@@ -39,7 +43,7 @@ export default function TasksScreen() {
         ...prev,
         { id: Date.now().toString(), text: newTaskText, completed: false },
       ]);
-      setNewTaskText('');
+      setNewTaskText("");
     }
   };
 
@@ -97,7 +101,7 @@ export default function TasksScreen() {
                         : colors.textSecondary,
                       backgroundColor: task.completed
                         ? colors.accent
-                        : 'transparent',
+                        : "transparent",
                     },
                   ]}
                 >
@@ -111,7 +115,9 @@ export default function TasksScreen() {
                   styles.taskText,
                   {
                     color: task.completed ? colors.textSecondary : colors.text,
-                    textDecorationLine: task.completed ? 'line-through' : 'none',
+                    textDecorationLine: task.completed
+                      ? "line-through"
+                      : "none",
                   },
                 ]}
               >
@@ -121,7 +127,11 @@ export default function TasksScreen() {
                 style={styles.deleteButton}
                 onPress={() => deleteTask(task.id)}
               >
-                <Ionicons name="trash-outline" size={20} color={colors.destructive} />
+                <Ionicons
+                  name="trash-outline"
+                  size={20}
+                  color={colors.destructive}
+                />
               </TouchableOpacity>
             </View>
           ))}
@@ -141,7 +151,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontWeight: '300',
+    fontWeight: "300",
     marginBottom: 4,
   },
   subtitle: {
@@ -149,8 +159,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderRadius: 12,
     padding: 4,
     marginBottom: 24,
@@ -165,15 +175,15 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   tasksList: {
     gap: 12,
   },
   taskItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 16,
     borderRadius: 12,
     gap: 12,
@@ -186,8 +196,8 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 6,
     borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   taskText: {
     flex: 1,

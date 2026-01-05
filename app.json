@@ -10,7 +10,10 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.studyapp.mobile"
+      "bundleIdentifier": "com.studyapp.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.studyapp.mobile"

@@ -15,6 +15,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../context/ThemeContext";
+import { Audio } from 'expo-av';
+import * as StorageService from "../services/storage";
+import { StudySession } from "../types";
 
 type TimerMode = "focus" | "break";
 type TimerState = "idle" | "running" | "paused";
@@ -24,12 +27,6 @@ interface Subject {
   name: string;
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
-}
-
-interface StudySession {
-  subject: string;
-  duration: number; // in seconds
-  date: string;
 }
 
 const DEFAULT_SUBJECTS: Subject[] = [
@@ -72,6 +69,9 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
   const [showSubjectPicker, setShowSubjectPicker] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [recentSessions, setRecentSessions] = useState<StudySession[]>([]);
+  const [focusDurations] = useState([15, 25, 45, 60, 90]); // minutes
+  const [selectedDuration, setSelectedDuration] = useState(25); // default 25 min
+  const [showDurationPicker, setShowDurationPicker] = useState(false);
 
   const appState = useRef(AppState.currentState);
   const backgroundTimeRef = useRef<number>(0);
@@ -96,6 +96,22 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
       }
     } catch (error) {
       console.error("Error loading break duration:", error);
+    }
+  };
+
+  const playCompletionSound = async () => {
+    try {
+      const settings = await StorageService.getUserSettings();
+      if (!settings.soundEnabled) return;
+      
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg' },
+        { shouldPlay: true }
+      );
+      await sound.playAsync();
+      setTimeout(() => sound.unloadAsync(), 3000);
+    } catch (error) {
+      console.error('Error playing sound:', error);
     }
   };
 
@@ -185,12 +201,21 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
         setSeconds((s) => {
           if (mode === "focus") {
             // Focus mode: count up
-            return s + 1;
+            const newTime = s + 1;
+            // Check if focus session is complete
+            if (newTime >= selectedDuration * 60) {
+              setState("idle");
+              playCompletionSound();
+              handleStop();
+              return newTime;
+            }
+            return newTime;
           } else {
             // Break mode: count down
             if (s <= 1) {
               // Timer finished
               setState("idle");
+              playCompletionSound();
               return 0;
             }
             return s - 1;
@@ -199,7 +224,7 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [state, mode]);
+  }, [state, mode, selectedDuration]);
 
   useEffect(() => {
     Animated.spring(modeAnimation, {
@@ -263,17 +288,8 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
         date: new Date().toISOString(),
       };
 
-      // Get existing sessions
-      const existingSessions = await AsyncStorage.getItem("studySessions");
-      const sessions: StudySession[] = existingSessions
-        ? JSON.parse(existingSessions)
-        : [];
-
-      // Add new session
-      sessions.push(session);
-
-      // Save back to storage
-      await AsyncStorage.setItem("studySessions", JSON.stringify(sessions));
+      // Use storage service to add session
+      await StorageService.addSession(session);
 
       // Reload recent sessions
       loadRecentSessions();
@@ -391,6 +407,21 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Focus Duration Selector (Only in Focus mode) */}
+        {mode === "focus" && (
+          <TouchableOpacity
+            style={[styles.durationButton, { backgroundColor: colors.card }]}
+            onPress={() => setShowDurationPicker(true)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="time-outline" size={18} color={colors.accent} />
+            <Text style={[styles.durationText, { color: colors.text }]}>
+              {selectedDuration} minutes
+            </Text>
+            <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
 
         {/* Timer Display */}
         <View style={styles.timerContainer}>
@@ -575,6 +606,71 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
         )}
       </View>
 
+      {/* Duration Picker Modal */}
+      <Modal
+        visible={showDurationPicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowDurationPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Focus Duration
+              </Text>
+              <TouchableOpacity onPress={() => setShowDurationPicker(false)}>
+                <Ionicons name="close" size={28} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.durationOptions}>
+              {focusDurations.map((duration) => (
+                <TouchableOpacity
+                  key={duration}
+                  style={[
+                    styles.durationOption,
+                    { backgroundColor: colors.background },
+                    selectedDuration === duration && {
+                      backgroundColor: colors.accent + "20",
+                      borderColor: colors.accent,
+                      borderWidth: 2,
+                    },
+                  ]}
+                  onPress={() => {
+                    setSelectedDuration(duration);
+                    setShowDurationPicker(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons 
+                    name="timer-outline" 
+                    size={32} 
+                    color={selectedDuration === duration ? colors.accent : colors.textSecondary} 
+                  />
+                  <Text
+                    style={[
+                      styles.durationOptionText,
+                      { color: selectedDuration === duration ? colors.accent : colors.text },
+                    ]}
+                  >
+                    {duration}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.durationOptionLabel,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    minutes
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Subject Picker Modal */}
       <Modal
         visible={showSubjectPicker}
@@ -683,6 +779,48 @@ const styles = StyleSheet.create({
   modeText: {
     fontSize: 16,
     fontWeight: "600",
+  },
+  durationButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginTop: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  durationText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  durationOptions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    paddingHorizontal: 24,
+    paddingBottom: 20,
+  },
+  durationOption: {
+    width: "30%",
+    aspectRatio: 1,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 12,
+  },
+  durationOptionText: {
+    fontSize: 24,
+    fontWeight: "700",
+    marginTop: 8,
+  },
+  durationOptionLabel: {
+    fontSize: 12,
+    marginTop: 4,
   },
   timerContainer: {
     marginTop: 80,

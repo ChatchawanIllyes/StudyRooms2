@@ -1,6 +1,9 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { useTheme } from "../context/ThemeContext";
+import { useFocusEffect } from "@react-navigation/native";
+import * as StorageService from "../services/storage";
+import { DailyStats } from "../types";
 
 interface StatsScreenProps {
   navigation?: any;
@@ -8,13 +11,108 @@ interface StatsScreenProps {
 
 export default function StatsScreen({ navigation }: StatsScreenProps) {
   const { colors } = useTheme();
+  const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadStats();
+    }, [])
+  );
+
+  const loadStats = async () => {
+    const stats = await StorageService.getDailyStats();
+    const subs = await StorageService.getSubjects();
+    setDailyStats(stats);
+    setSubjects(subs);
+  };
+
+  // Calculate stats
+  const calculateStats = () => {
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+    
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    let todayMinutes = 0;
+    let weekMinutes = 0;
+    let monthMinutes = 0;
+    let totalMinutes = 0;
+    const subjectMinutes: { [key: string]: number } = {};
+
+    dailyStats.forEach((stat) => {
+      const statDate = new Date(stat.date);
+      const minutes = stat.totalMinutes || 0;
+      
+      totalMinutes += minutes;
+      
+      if (stat.date === todayStr) {
+        todayMinutes += minutes;
+      }
+      
+      if (statDate >= startOfWeek) {
+        weekMinutes += minutes;
+      }
+      
+      if (statDate >= startOfMonth) {
+        monthMinutes += minutes;
+      }
+
+      // Subject breakdown
+      stat.sessions?.forEach((session) => {
+        const subject = session.subject || "Other";
+        subjectMinutes[subject] = (subjectMinutes[subject] || 0) + (session.minutes || 0);
+      });
+    });
+
+    return {
+      today: todayMinutes,
+      week: weekMinutes,
+      month: monthMinutes,
+      total: totalMinutes,
+      subjects: subjectMinutes,
+    };
+  };
+
+  const formatTime = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours === 0) return `${mins}m`;
+    return `${hours}h ${mins}m`;
+  };
+
+  const statsData = calculateStats();
 
   const stats = [
-    { label: "Today", value: "1h 8m", color: colors.accent },
-    { label: "This Week", value: "8h 24m", color: "#34c759" },
-    { label: "This Month", value: "42h 15m", color: "#ff9500" },
-    { label: "Total", value: "186h 32m", color: "#af52de" },
+    { label: "Today", value: formatTime(statsData.today), color: colors.accent },
+    { label: "This Week", value: formatTime(statsData.week), color: "#34c759" },
+    { label: "This Month", value: formatTime(statsData.month), color: "#ff9500" },
+    { label: "Total", value: formatTime(statsData.total), color: "#af52de" },
   ];
+
+  // Get last 7 days for chart
+  const getLast7Days = () => {
+    const days = [];
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(now.getDate() - i);
+      const dateStr = date.toISOString().split("T")[0];
+      const dayStat = dailyStats.find((s) => s.date === dateStr);
+      days.push({
+        day: ["S", "M", "T", "W", "T", "F", "S"][date.getDay()],
+        minutes: dayStat?.totalMinutes || 0,
+      });
+    }
+    return days;
+  };
+
+  const last7Days = getLast7Days();
+  const maxMinutes = Math.max(...last7Days.map((d) => d.minutes), 1);
 
   return (
     <View style={{ flex: 1 }}>
@@ -46,36 +144,77 @@ export default function StatsScreen({ navigation }: StatsScreenProps) {
           ))}
         </View>
 
-        {/* Weekly Chart Placeholder */}
+        {/* Weekly Chart */}
         <View style={[styles.chartCard, { backgroundColor: colors.card }]}>
           <Text style={[styles.chartTitle, { color: colors.text }]}>
             Weekly Activity
           </Text>
           <View style={styles.chartPlaceholder}>
-            {["M", "T", "W", "T", "F", "S", "S"].map((day, index) => {
-              const heights = [60, 80, 45, 90, 70, 30, 50];
+            {last7Days.map((dayData, index) => {
+              const height = maxMinutes > 0 ? (dayData.minutes / maxMinutes) * 100 : 0;
               return (
                 <View key={index} style={styles.chartBar}>
                   <View
                     style={[
                       styles.chartBarFill,
                       {
-                        height: `${heights[index]}%`,
+                        height: `${Math.max(height, 5)}%`,
                         backgroundColor: colors.accent,
-                        opacity: 0.8,
+                        opacity: dayData.minutes > 0 ? 0.8 : 0.2,
                       },
                     ]}
                   />
                   <Text
                     style={[styles.chartDay, { color: colors.textSecondary }]}
                   >
-                    {day}
+                    {dayData.day}
                   </Text>
                 </View>
               );
             })}
           </View>
         </View>
+
+        {/* Subject Breakdown */}
+        {Object.keys(statsData.subjects).length > 0 && (
+          <View style={[styles.chartCard, { backgroundColor: colors.card, marginTop: 16 }]}>
+            <Text style={[styles.chartTitle, { color: colors.text }]}>
+              Subject Breakdown
+            </Text>
+            <View style={styles.subjectList}>
+              {Object.entries(statsData.subjects)
+                .sort(([, a], [, b]) => (b as number) - (a as number))
+                .map(([subject, minutes]) => {
+                  const subjectData = subjects.find((s) => s.name === subject);
+                  const color = subjectData?.color || colors.accent;
+                  const percentage = statsData.total > 0 
+                    ? ((minutes as number) / statsData.total * 100).toFixed(1)
+                    : 0;
+                  
+                  return (
+                    <View key={subject} style={styles.subjectRow}>
+                      <View style={styles.subjectInfo}>
+                        <View
+                          style={[styles.subjectDot, { backgroundColor: color }]}
+                        />
+                        <Text style={[styles.subjectName, { color: colors.text }]}>
+                          {subject}
+                        </Text>
+                      </View>
+                      <View style={styles.subjectStats}>
+                        <Text style={[styles.subjectTime, { color: colors.text }]}>
+                          {formatTime(minutes as number)}
+                        </Text>
+                        <Text style={[styles.subjectPercent, { color: colors.textSecondary }]}>
+                          {percentage}%
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })}
+            </View>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -161,5 +300,39 @@ const styles = StyleSheet.create({
   },
   chartDay: {
     fontSize: 12,
+  },
+  subjectList: {
+    gap: 12,
+  },
+  subjectRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  subjectInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  subjectDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  subjectName: {
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  subjectStats: {
+    alignItems: "flex-end",
+  },
+  subjectTime: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  subjectPercent: {
+    fontSize: 12,
+    marginTop: 2,
   },
 });

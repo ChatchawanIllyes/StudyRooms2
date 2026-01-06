@@ -31,11 +31,11 @@ export default function StatsScreen({ navigation }: StatsScreenProps) {
   const calculateStats = () => {
     const now = new Date();
     const todayStr = now.toISOString().split("T")[0];
-    
+
     const startOfWeek = new Date(now);
     startOfWeek.setDate(now.getDate() - now.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
-    
+
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     let todayMinutes = 0;
@@ -47,17 +47,17 @@ export default function StatsScreen({ navigation }: StatsScreenProps) {
     dailyStats.forEach((stat) => {
       const statDate = new Date(stat.date);
       const minutes = stat.totalMinutes || 0;
-      
+
       totalMinutes += minutes;
-      
+
       if (stat.date === todayStr) {
         todayMinutes += minutes;
       }
-      
+
       if (statDate >= startOfWeek) {
         weekMinutes += minutes;
       }
-      
+
       if (statDate >= startOfMonth) {
         monthMinutes += minutes;
       }
@@ -65,7 +65,8 @@ export default function StatsScreen({ navigation }: StatsScreenProps) {
       // Subject breakdown
       stat.sessions?.forEach((session) => {
         const subject = session.subject || "Other";
-        subjectMinutes[subject] = (subjectMinutes[subject] || 0) + (session.minutes || 0);
+        subjectMinutes[subject] =
+          (subjectMinutes[subject] || 0) + (session.minutes || 0);
       });
     });
 
@@ -88,9 +89,17 @@ export default function StatsScreen({ navigation }: StatsScreenProps) {
   const statsData = calculateStats();
 
   const stats = [
-    { label: "Today", value: formatTime(statsData.today), color: colors.accent },
+    {
+      label: "Today",
+      value: formatTime(statsData.today),
+      color: colors.accent,
+    },
     { label: "This Week", value: formatTime(statsData.week), color: "#34c759" },
-    { label: "This Month", value: formatTime(statsData.month), color: "#ff9500" },
+    {
+      label: "This Month",
+      value: formatTime(statsData.month),
+      color: "#ff9500",
+    },
     { label: "Total", value: formatTime(statsData.total), color: "#af52de" },
   ];
 
@@ -151,7 +160,8 @@ export default function StatsScreen({ navigation }: StatsScreenProps) {
           </Text>
           <View style={styles.chartPlaceholder}>
             {last7Days.map((dayData, index) => {
-              const height = maxMinutes > 0 ? (dayData.minutes / maxMinutes) * 100 : 0;
+              const height =
+                maxMinutes > 0 ? (dayData.minutes / maxMinutes) * 100 : 0;
               return (
                 <View key={index} style={styles.chartBar}>
                   <View
@@ -177,7 +187,12 @@ export default function StatsScreen({ navigation }: StatsScreenProps) {
 
         {/* Subject Breakdown */}
         {Object.keys(statsData.subjects).length > 0 && (
-          <View style={[styles.chartCard, { backgroundColor: colors.card, marginTop: 16 }]}>
+          <View
+            style={[
+              styles.chartCard,
+              { backgroundColor: colors.card, marginTop: 16 },
+            ]}
+          >
             <Text style={[styles.chartTitle, { color: colors.text }]}>
               Subject Breakdown
             </Text>
@@ -187,25 +202,40 @@ export default function StatsScreen({ navigation }: StatsScreenProps) {
                 .map(([subject, minutes]) => {
                   const subjectData = subjects.find((s) => s.name === subject);
                   const color = subjectData?.color || colors.accent;
-                  const percentage = statsData.total > 0 
-                    ? ((minutes as number) / statsData.total * 100).toFixed(1)
-                    : 0;
-                  
+                  const percentage =
+                    statsData.total > 0
+                      ? (((minutes as number) / statsData.total) * 100).toFixed(
+                          1
+                        )
+                      : 0;
+
                   return (
                     <View key={subject} style={styles.subjectRow}>
                       <View style={styles.subjectInfo}>
                         <View
-                          style={[styles.subjectDot, { backgroundColor: color }]}
+                          style={[
+                            styles.subjectDot,
+                            { backgroundColor: color },
+                          ]}
                         />
-                        <Text style={[styles.subjectName, { color: colors.text }]}>
+                        <Text
+                          style={[styles.subjectName, { color: colors.text }]}
+                        >
                           {subject}
                         </Text>
                       </View>
                       <View style={styles.subjectStats}>
-                        <Text style={[styles.subjectTime, { color: colors.text }]}>
+                        <Text
+                          style={[styles.subjectTime, { color: colors.text }]}
+                        >
                           {formatTime(minutes as number)}
                         </Text>
-                        <Text style={[styles.subjectPercent, { color: colors.textSecondary }]}>
+                        <Text
+                          style={[
+                            styles.subjectPercent,
+                            { color: colors.textSecondary },
+                          ]}
+                        >
                           {percentage}%
                         </Text>
                       </View>

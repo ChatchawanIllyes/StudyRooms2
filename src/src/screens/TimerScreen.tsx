@@ -15,7 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../context/ThemeContext";
-import { Audio } from 'expo-av';
+import { Audio } from "expo-av";
 import * as StorageService from "../services/storage";
 import { StudySession } from "../types";
 
@@ -103,15 +103,17 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
     try {
       const settings = await StorageService.getUserSettings();
       if (!settings.soundEnabled) return;
-      
+
       const { sound } = await Audio.Sound.createAsync(
-        { uri: 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg' },
+        {
+          uri: "https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg",
+        },
         { shouldPlay: true }
       );
       await sound.playAsync();
       setTimeout(() => sound.unloadAsync(), 3000);
     } catch (error) {
-      console.error('Error playing sound:', error);
+      console.error("Error playing sound:", error);
     }
   };
 
@@ -419,7 +421,11 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
             <Text style={[styles.durationText, { color: colors.text }]}>
               {selectedDuration} minutes
             </Text>
-            <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
+            <Ionicons
+              name="chevron-down"
+              size={16}
+              color={colors.textSecondary}
+            />
           </TouchableOpacity>
         )}
 
@@ -643,15 +649,24 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
                   }}
                   activeOpacity={0.7}
                 >
-                  <Ionicons 
-                    name="timer-outline" 
-                    size={32} 
-                    color={selectedDuration === duration ? colors.accent : colors.textSecondary} 
+                  <Ionicons
+                    name="timer-outline"
+                    size={32}
+                    color={
+                      selectedDuration === duration
+                        ? colors.accent
+                        : colors.textSecondary
+                    }
                   />
                   <Text
                     style={[
                       styles.durationOptionText,
-                      { color: selectedDuration === duration ? colors.accent : colors.text },
+                      {
+                        color:
+                          selectedDuration === duration
+                            ? colors.accent
+                            : colors.text,
+                      },
                     ]}
                   >
                     {duration}

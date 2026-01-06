@@ -25,9 +25,15 @@ export default function TasksScreen({ navigation }: TasksScreenProps) {
   const [newTaskText, setNewTaskText] = useState("");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
-  const [selectedPriority, setSelectedPriority] = useState<"low" | "medium" | "high">("medium");
-  const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
-  const [selectedDueDate, setSelectedDueDate] = useState<Date | undefined>(undefined);
+  const [selectedPriority, setSelectedPriority] = useState<
+    "low" | "medium" | "high"
+  >("medium");
+  const [selectedCategory, setSelectedCategory] = useState<string | undefined>(
+    undefined
+  );
+  const [selectedDueDate, setSelectedDueDate] = useState<Date | undefined>(
+    undefined
+  );
   const [subjects, setSubjects] = useState<any[]>([]);
 
   // Load tasks and subjects
@@ -51,19 +57,19 @@ export default function TasksScreen({ navigation }: TasksScreenProps) {
   const toggleTask = async (id: string) => {
     const task = tasks.find((t) => t.id === id);
     if (!task) return;
-    
+
     const updates: Partial<Task> = {
       completed: !task.completed,
       completedAt: !task.completed ? new Date().toISOString() : undefined,
     };
-    
+
     await StorageService.updateTask(id, updates);
     await loadTasks();
   };
 
   const addTask = async () => {
     if (!newTaskText.trim()) return;
-    
+
     const newTask: Task = {
       id: Date.now().toString(),
       text: newTaskText,
@@ -73,7 +79,7 @@ export default function TasksScreen({ navigation }: TasksScreenProps) {
       category: selectedCategory,
       dueDate: selectedDueDate?.toISOString(),
     };
-    
+
     await StorageService.addTask(newTask);
     setNewTaskText("");
     setSelectedPriority("medium");
@@ -89,9 +95,12 @@ export default function TasksScreen({ navigation }: TasksScreenProps) {
 
   const getPriorityColor = (priority: "low" | "medium" | "high") => {
     switch (priority) {
-      case "high": return "#ff3b30";
-      case "medium": return "#ff9500";
-      case "low": return "#34c759";
+      case "high":
+        return "#ff3b30";
+      case "medium":
+        return "#ff9500";
+      case "low":
+        return "#34c759";
     }
   };
 
@@ -112,30 +121,30 @@ export default function TasksScreen({ navigation }: TasksScreenProps) {
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
+
     if (date.toDateString() === today.toDateString()) return "Today";
     if (date.toDateString() === tomorrow.toDateString()) return "Tomorrow";
-    
+
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
   const sortedTasks = [...tasks].sort((a, b) => {
     // Completed tasks go to bottom
     if (a.completed !== b.completed) return a.completed ? 1 : -1;
-    
+
     // Then by priority
     const priorityOrder = { high: 0, medium: 1, low: 2 };
     if (a.priority !== b.priority) {
       return priorityOrder[a.priority] - priorityOrder[b.priority];
     }
-    
+
     // Then by due date
     if (a.dueDate && b.dueDate) {
       return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
     }
     if (a.dueDate) return -1;
     if (b.dueDate) return 1;
-    
+
     // Finally by creation date
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
@@ -181,9 +190,7 @@ export default function TasksScreen({ navigation }: TasksScreenProps) {
                     styles.priorityText,
                     {
                       color:
-                        selectedPriority === priority
-                          ? "white"
-                          : colors.text,
+                        selectedPriority === priority ? "white" : colors.text,
                     },
                   ]}
                 >

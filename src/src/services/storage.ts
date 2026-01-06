@@ -44,7 +44,10 @@ export const addTask = async (task: Task): Promise<void> => {
   await saveTasks(tasks);
 };
 
-export const updateTask = async (taskId: string, updates: Partial<Task>): Promise<void> => {
+export const updateTask = async (
+  taskId: string,
+  updates: Partial<Task>
+): Promise<void> => {
   const tasks = await getTasks();
   const index = tasks.findIndex((t) => t.id === taskId);
   if (index !== -1) {
@@ -82,12 +85,14 @@ export const addSession = async (session: StudySession): Promise<void> => {
   const sessions = await getSessions();
   sessions.push(session);
   await saveSessions(sessions);
-  
+
   // Update daily stats
   await updateDailyStats(session);
 };
 
-export const getRecentSessions = async (limit: number = 10): Promise<StudySession[]> => {
+export const getRecentSessions = async (
+  limit: number = 10
+): Promise<StudySession[]> => {
   const sessions = await getSessions();
   return sessions
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -116,9 +121,9 @@ export const saveDailyStats = async (stats: DailyStats[]): Promise<void> => {
 const updateDailyStats = async (session: StudySession): Promise<void> => {
   const stats = await getDailyStats();
   const dateKey = new Date(session.date).toISOString().split("T")[0];
-  
+
   let dayStats = stats.find((s) => s.date === dateKey);
-  
+
   if (!dayStats) {
     dayStats = {
       date: dateKey,
@@ -128,16 +133,16 @@ const updateDailyStats = async (session: StudySession): Promise<void> => {
     };
     stats.push(dayStats);
   }
-  
+
   const minutes = Math.floor(session.duration / 60);
   dayStats.totalMinutes += minutes;
   dayStats.sessions += 1;
-  
+
   if (!dayStats.subjectBreakdown[session.subjectId]) {
     dayStats.subjectBreakdown[session.subjectId] = 0;
   }
   dayStats.subjectBreakdown[session.subjectId] += minutes;
-  
+
   await saveDailyStats(stats);
 };
 
@@ -154,7 +159,7 @@ export const getStatsForPeriod = async (
   const stats = await getDailyStats();
   const start = startDate.toISOString().split("T")[0];
   const end = endDate.toISOString().split("T")[0];
-  
+
   return stats.filter((s) => s.date >= start && s.date <= end);
 };
 
@@ -181,7 +186,9 @@ export const getUserSettings = async (): Promise<UserSettings> => {
   }
 };
 
-export const saveUserSettings = async (settings: Partial<UserSettings>): Promise<void> => {
+export const saveUserSettings = async (
+  settings: Partial<UserSettings>
+): Promise<void> => {
   try {
     const current = await getUserSettings();
     const updated = { ...current, ...settings };
@@ -219,7 +226,12 @@ const getDefaultSubjects = (): Subject[] => [
   { id: "science", name: "Science", icon: "flask", color: "#34c759" },
   { id: "english", name: "English", icon: "book", color: "#ff9500" },
   { id: "history", name: "History", icon: "time", color: "#af52de" },
-  { id: "programming", name: "Programming", icon: "code-slash", color: "#5ac8fa" },
+  {
+    id: "programming",
+    name: "Programming",
+    icon: "code-slash",
+    color: "#5ac8fa",
+  },
   { id: "art", name: "Art", icon: "color-palette", color: "#ff2d55" },
   { id: "music", name: "Music", icon: "musical-notes", color: "#ff3b30" },
   { id: "language", name: "Language", icon: "language", color: "#5856d6" },

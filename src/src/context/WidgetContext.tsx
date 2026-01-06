@@ -50,6 +50,8 @@ interface WidgetContextType {
   setIsEditMode: (mode: boolean) => void;
   resizeState: ResizeState | null;
   setResizeState: (state: ResizeState | null) => void;
+  placementMode: { widgetType: WidgetType; previewPosition: number | null } | null;
+  setPlacementMode: (mode: { widgetType: WidgetType; previewPosition: number | null } | null) => void;
   homeTitle: string;
   setHomeTitle: (title: string) => void;
   homeDescription: string;
@@ -66,6 +68,7 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
   const [widgets, setWidgets] = useState<WidgetConfig[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
+  const [placementMode, setPlacementMode] = useState<{ widgetType: WidgetType; previewPosition: number | null } | null>(null);
   const [homeTitle, setHomeTitle] = useState("Home");
   const [homeDescription, setHomeDescription] = useState("Your study space");
 
@@ -380,6 +383,8 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
         setIsEditMode,
         resizeState,
         setResizeState,
+        placementMode,
+        setPlacementMode,
         homeTitle,
         setHomeTitle: saveHomeTitle,
         homeDescription,

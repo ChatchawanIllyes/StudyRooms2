@@ -117,6 +117,7 @@ export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const {
     widgets,
+    addWidget,
     removeWidget,
     resizeWidget,
     moveWidget,
@@ -127,6 +128,8 @@ export default function HomeScreen() {
     getValidAdjacentPositions,
     getSizeFromPositions,
     setResizeState,
+    placementMode,
+    setPlacementMode,
     homeTitle,
     setHomeTitle,
     homeDescription,
@@ -143,6 +146,7 @@ export default function HomeScreen() {
     React.useCallback(() => {
       setIsEditMode(false);
       setResizeState(null);
+      // Don't clear placement mode here - let it persist
     }, [setIsEditMode, setResizeState])
   );
 
@@ -172,6 +176,27 @@ export default function HomeScreen() {
 
   const handleBuildPress = () => {
     navigation.navigate("MyWidgets");
+  };
+
+  const handlePlacementSlotClick = (position: number) => {
+    if (!placementMode) return;
+    
+    // Update preview position
+    setPlacementMode({
+      ...placementMode,
+      previewPosition: position,
+    });
+  };
+
+  const handleConfirmPlacement = () => {
+    if (!placementMode || placementMode.previewPosition === null) return;
+    
+    addWidget(placementMode.widgetType, placementMode.previewPosition, "1x1");
+    setPlacementMode(null);
+  };
+
+  const handleCancelPlacement = () => {
+    setPlacementMode(null);
   };
 
   const handleEditToggle = () => {
@@ -349,8 +374,10 @@ export default function HomeScreen() {
         const top = row * (SLOT_SIZE + GAP);
 
         emptySlots.push(
-          <View
+          <TouchableOpacity
             key={`empty-${i}`}
+            activeOpacity={placementMode ? 0.7 : 1}
+            onPress={() => placementMode && handlePlacementSlotClick(i)}
             style={[
               styles.gridSlot,
               {
@@ -465,6 +492,41 @@ export default function HomeScreen() {
       );
     });
 
+    // Render placement preview widget
+    if (placementMode && placementMode.previewPosition !== null) {
+      const { row, col } = getPositionCoordinates(placementMode.previewPosition);
+      const left = col * (SLOT_SIZE + GAP);
+      const top = row * (SLOT_SIZE + GAP);
+
+      widgetElements.push(
+        <View
+          key="placement-preview"
+          style={{
+            position: "absolute",
+            left,
+            top,
+            zIndex: 15,
+          }}
+        >
+          <WidgetTile
+            type={placementMode.widgetType}
+            size="1x1"
+            position={placementMode.previewPosition}
+            isEditMode={false}
+            onPress={() => {}}
+          />
+          {/* Checkmark button on preview */}
+          <TouchableOpacity
+            style={[styles.confirmPlacementButton, { backgroundColor: accentColor }]}
+            onPress={handleConfirmPlacement}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="checkmark" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
     return (
       <View style={styles.gridWrapper}>
         {emptySlots}
@@ -530,10 +592,27 @@ export default function HomeScreen() {
         style={[styles.container, { backgroundColor: colors.background }]}
         edges={["top"]}
       >
-        {/* Header */}
-        <View style={styles.header}>
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          activeOpacity={1}
+          onPress={() => placementMode && handleCancelPlacement()}
+        >
+          <View style={{ flex: 1 }} onStartShouldSetResponder={() => false}>
+            {/* Header */}
+            <View style={styles.header}>
           <View style={styles.headerText}>
-            {isEditingTitle ? (
+            {placementMode ? (
+              <>
+                <Text style={[styles.title, { color: colors.text }]}>
+                  Choose position
+                </Text>
+                <Text
+                  style={[styles.subtitle, { color: colors.textSecondary }]}
+                >
+                  Tap an empty slot
+                </Text>
+              </>
+            ) : isEditingTitle ? (
               <TextInput
                 style={[
                   styles.titleInput,
@@ -549,9 +628,11 @@ export default function HomeScreen() {
               />
             ) : (
               <TouchableOpacity onPress={handleTitleEdit} activeOpacity={0.7}>
-                <Text style={[styles.title, { color: colors.text }]}>
-                  {homeTitle}
-                </Text>
+                <View style={styles.editableTextContainer}>
+                  <Text style={[styles.title, { color: colors.text }]}>
+                    {homeTitle}
+                  </Text>
+                </View>
               </TouchableOpacity>
             )}
             {isEditingDescription ? (
@@ -573,51 +654,57 @@ export default function HomeScreen() {
                 onPress={handleDescriptionEdit}
                 activeOpacity={0.7}
               >
-                <Text
-                  style={[styles.subtitle, { color: colors.textSecondary }]}
-                >
-                  {homeDescription}
-                </Text>
+                <View style={styles.editableTextContainer}>
+                  <Text
+                    style={[styles.subtitle, { color: colors.textSecondary }]}
+                  >
+                    {homeDescription}
+                  </Text>
+                </View>
               </TouchableOpacity>
             )}
           </View>
-          <View style={styles.headerButtons}>
-            {widgets.length > 0 && (
+          {!placementMode && (
+            <View style={styles.headerButtons}>
+              {widgets.length > 0 && (
+                <TouchableOpacity
+                  activeOpacity={0.6}
+                  onPress={handleEditToggle}
+                  style={styles.editButton}
+                >
+                  {isEditMode ? (
+                    <Text style={[styles.editButtonText, { color: accentColor }]}>
+                      Done
+                    </Text>
+                  ) : (
+                    <Ionicons
+                      name="hammer-outline"
+                      size={24}
+                      color={accentColor}
+                    />
+                  )}
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 activeOpacity={0.6}
-                onPress={handleEditToggle}
-                style={styles.editButton}
+                onPressIn={() => setBuildPressed(true)}
+                onPressOut={() => setBuildPressed(false)}
+                onPress={handleBuildPress}
+                style={[
+                  styles.buildButton,
+                  buildPressed && styles.buildButtonPressed,
+                ]}
               >
-                {isEditMode ? (
-                  <Text style={[styles.editButtonText, { color: accentColor }]}>
-                    Done
-                  </Text>
-                ) : (
-                  <Ionicons
-                    name="hammer-outline"
-                    size={24}
-                    color={accentColor}
-                  />
-                )}
+                <Ionicons name="add" size={28} color={accentColor} />
               </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              activeOpacity={0.6}
-              onPressIn={() => setBuildPressed(true)}
-              onPressOut={() => setBuildPressed(false)}
-              onPress={handleBuildPress}
-              style={[
-                styles.buildButton,
-                buildPressed && styles.buildButtonPressed,
-              ]}
-            >
-              <Ionicons name="add" size={28} color={accentColor} />
-            </TouchableOpacity>
-          </View>
+            </View>
+          )}
         </View>
 
         {/* Grid Area */}
         <View style={styles.gridContainer}>{renderGrid()}</View>
+        </View>
+      </TouchableOpacity>
       </SafeAreaView>
     </GestureHandlerRootView>
   );
@@ -646,6 +733,9 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   headerButtons: {
+    position: "absolute",
+    right: 20,
+    top: Platform.OS === "ios" ? 8 : 16,
     flexDirection: "row",
     gap: 12,
   },
@@ -723,6 +813,11 @@ const styles = StyleSheet.create({
   },
   headerText: {
     flex: 1,
+    paddingRight: 120,
+  },
+  editableTextContainer: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   titleInput: {
     fontSize: 28,
@@ -741,5 +836,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderWidth: 1,
     borderRadius: 8,
+  },
+  confirmPlacementButton: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
 });

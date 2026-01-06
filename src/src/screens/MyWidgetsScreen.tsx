@@ -44,7 +44,7 @@ const AVAILABLE_WIDGETS: Array<{
 export default function MyWidgetsScreen() {
   const { colors, accentColor } = useTheme();
   const navigation = useNavigation<any>();
-  const { widgets, getOccupiedPositions } = useWidgets();
+  const { widgets, getOccupiedPositions, setPlacementMode } = useWidgets();
 
   const handleAddWidget = (widgetType: WidgetType) => {
     const occupiedPositions = getOccupiedPositions();
@@ -59,7 +59,8 @@ export default function MyWidgetsScreen() {
       return;
     }
 
-    navigation.navigate("PlaceWidget", { widgetType });
+    setPlacementMode({ widgetType, previewPosition: null });
+    navigation.navigate("Home");
   };
 
   const installedWidgets = widgets.map((w) => w.type);
@@ -107,6 +108,17 @@ export default function MyWidgetsScreen() {
                 installed
               </Text>
             </View>
+          )}
+
+          {/* Marketplace message when all widgets installed or none available */}
+          {(widgets.length === 3 || AVAILABLE_WIDGETS.filter(
+            (widget) => !installedWidgets.includes(widget.type)
+          ).length === 0) && (
+            <Text
+              style={[styles.marketplaceHint, { color: colors.textSecondary }]}
+            >
+              Explore the marketplace for more widgets
+            </Text>
           )}
 
           <View style={styles.widgetGrid}>
@@ -210,9 +222,17 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     letterSpacing: -0.2,
   },
+  marketplaceHint: {
+    fontSize: 14,
+    letterSpacing: -0.2,
+    marginTop: 8,
+    marginBottom: 4,
+    opacity: 0.7,
+    textAlign: "center",
+  },
   fab: {
     position: "absolute",
-    bottom: 32,
+    bottom: 24,
     right: 20,
     width: 60,
     height: 60,

@@ -20,6 +20,7 @@ import FocusNavigator from "./src/screens/FocusNavigator";
 import RoomsNavigator from "./src/screens/RoomsNavigator";
 import SettingsScreen from "./src/screens/SettingsScreen";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
+import { WidgetProvider } from "./src/context/WidgetContext";
 
 const Tab = createBottomTabNavigator();
 
@@ -102,7 +103,9 @@ function AppContent() {
 export default function App() {
   return (
     <ThemeProvider>
-      <AppContent />
+      <WidgetProvider>
+        <AppContent />
+      </WidgetProvider>
     </ThemeProvider>
   );
 }

@@ -15,7 +15,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../context/ThemeContext";
-import { Audio } from "expo-av";
 import * as StorageService from "../services/storage";
 import { StudySession } from "../types";
 
@@ -73,7 +72,7 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
   const [selectedDuration, setSelectedDuration] = useState(25); // default 25 min
   const [showDurationPicker, setShowDurationPicker] = useState(false);
 
-  const appState = useRef(AppState.currentState);
+  const [appStateValue, setAppStateValue] = useState<AppStateStatus>('active');
   const backgroundTimeRef = useRef<number>(0);
   const notificationIdRef = useRef<string | null>(null);
 
@@ -104,14 +103,9 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
       const settings = await StorageService.getUserSettings();
       if (!settings.soundEnabled) return;
 
-      const { sound } = await Audio.Sound.createAsync(
-        {
-          uri: "https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg",
-        },
-        { shouldPlay: true }
-      );
-      await sound.playAsync();
-      setTimeout(() => sound.unloadAsync(), 3000);
+      // Audio functionality removed - expo-av deprecated
+      // TODO: Implement with expo-audio when needed
+      console.log('Timer completed!');
     } catch (error) {
       console.error("Error playing sound:", error);
     }
@@ -159,7 +153,7 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
 
   const handleAppStateChange = (nextAppState: AppStateStatus) => {
     if (
-      appState.current.match(/inactive|background/) &&
+      appStateValue.match(/inactive|background/) &&
       nextAppState === "active"
     ) {
       // App has come to foreground
@@ -184,7 +178,7 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
         backgroundTimeRef.current = 0;
       }
     } else if (
-      appState.current === "active" &&
+      appStateValue === "active" &&
       nextAppState.match(/inactive|background/)
     ) {
       // App has gone to background
@@ -193,7 +187,7 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
       }
     }
 
-    appState.current = nextAppState;
+    setAppStateValue(nextAppState);
   };
 
   useEffect(() => {

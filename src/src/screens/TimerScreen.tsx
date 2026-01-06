@@ -6,6 +6,8 @@ import {
   StyleSheet,
   Animated,
   Dimensions,
+  ScrollView,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -14,6 +16,40 @@ import { useTheme } from "../context/ThemeContext";
 
 type TimerMode = "focus" | "break";
 type TimerState = "idle" | "running" | "paused";
+
+interface Subject {
+  id: string;
+  name: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+}
+
+interface StudySession {
+  subject: string;
+  duration: number; // in seconds
+  date: string;
+}
+
+const DEFAULT_SUBJECTS: Subject[] = [
+  { id: "math", name: "Math", icon: "calculator", color: "#5b9bd5" },
+  { id: "science", name: "Science", icon: "flask", color: "#34c759" },
+  { id: "english", name: "English", icon: "book", color: "#ff9500" },
+  { id: "history", name: "History", icon: "time", color: "#af52de" },
+  {
+    id: "programming",
+    name: "Programming",
+    icon: "code-slash",
+    color: "#5ac8fa",
+  },
+  { id: "art", name: "Art", icon: "color-palette", color: "#ff2d55" },
+  { id: "music", name: "Music", icon: "musical-notes", color: "#ff3b30" },
+  { id: "language", name: "Language", icon: "language", color: "#5856d6" },
+  { id: "business", name: "Business", icon: "briefcase", color: "#ffcc00" },
+  { id: "engineering", name: "Engineering", icon: "build", color: "#007aff" },
+  { id: "medicine", name: "Medicine", icon: "medical", color: "#ff3b30" },
+  { id: "law", name: "Law", icon: "hammer", color: "#8e8e93" },
+  { id: "other", name: "Other", icon: "ellipsis-horizontal", color: "#8e8e93" },
+];
 
 interface TimerScreenProps {
   navigation?: any;
@@ -28,6 +64,10 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
   const [dailyGoal, setDailyGoal] = useState(120);
   const [breakDuration, setBreakDuration] = useState(5 * 60); // Default: 5 minutes
   const [modeAnimation] = useState(new Animated.Value(0));
+  const [selectedSubject, setSelectedSubject] = useState<Subject>(
+    DEFAULT_SUBJECTS[0]
+  );
+  const [showSubjectPicker, setShowSubjectPicker] = useState(false);
 
   const loadDailyGoal = async () => {
     try {
@@ -121,13 +161,41 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
   const handleStop = () => {
     // Only add to study time if in Focus mode
     if (seconds > 0 && mode === "focus") {
-      setTodayMinutes((prev) => prev + Math.floor(seconds / 60));
+      const minutesStudied = Math.floor(seconds / 60);
+      setTodayMinutes((prev) => prev + minutesStudied);
+
+      // Save study session with subject
+      saveStudySession(selectedSubject.id, seconds);
     }
     setState("idle");
     if (mode === "break") {
       setSeconds(breakDuration);
     } else {
       setSeconds(0);
+    }
+  };
+
+  const saveStudySession = async (subjectId: string, duration: number) => {
+    try {
+      const session: StudySession = {
+        subject: subjectId,
+        duration: duration,
+        date: new Date().toISOString(),
+      };
+
+      // Get existing sessions
+      const existingSessions = await AsyncStorage.getItem("studySessions");
+      const sessions: StudySession[] = existingSessions
+        ? JSON.parse(existingSessions)
+        : [];
+
+      // Add new session
+      sessions.push(session);
+
+      // Save back to storage
+      await AsyncStorage.setItem("studySessions", JSON.stringify(sessions));
+    } catch (error) {
+      console.error("Error saving study session:", error);
     }
   };
 
@@ -262,6 +330,39 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
           )}
         </View>
 
+        {/* Subject Selector (Only in Focus mode) */}
+        {mode === "focus" && (
+          <View style={styles.subjectContainer}>
+            <Text
+              style={[styles.subjectLabel, { color: colors.textSecondary }]}
+            >
+              Subject
+            </Text>
+            <TouchableOpacity
+              style={[styles.subjectSelector, { backgroundColor: colors.card }]}
+              onPress={() => setShowSubjectPicker(true)}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  styles.subjectIconContainer,
+                  { backgroundColor: selectedSubject.color },
+                ]}
+              >
+                <Ionicons name={selectedSubject.icon} size={20} color="white" />
+              </View>
+              <Text style={[styles.subjectText, { color: colors.text }]}>
+                {selectedSubject.name}
+              </Text>
+              <Ionicons
+                name="chevron-down"
+                size={18}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Progress */}
         {mode === "focus" && (
           <View style={styles.progressContainer}>
@@ -290,6 +391,72 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
           </View>
         )}
       </View>
+
+      {/* Subject Picker Modal */}
+      <Modal
+        visible={showSubjectPicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowSubjectPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Select Subject
+              </Text>
+              <TouchableOpacity onPress={() => setShowSubjectPicker(false)}>
+                <Ionicons name="close" size={28} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.subjectList}>
+              {DEFAULT_SUBJECTS.map((subject) => (
+                <TouchableOpacity
+                  key={subject.id}
+                  style={[
+                    styles.subjectOption,
+                    { backgroundColor: colors.background },
+                    selectedSubject.id === subject.id && {
+                      backgroundColor: subject.color + "20",
+                      borderColor: subject.color,
+                      borderWidth: 2,
+                    },
+                  ]}
+                  onPress={() => {
+                    setSelectedSubject(subject);
+                    setShowSubjectPicker(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.subjectOptionLeft}>
+                    <View
+                      style={[
+                        styles.subjectIconContainer,
+                        { backgroundColor: subject.color },
+                      ]}
+                    >
+                      <Ionicons name={subject.icon} size={24} color="white" />
+                    </View>
+                    <Text
+                      style={[styles.subjectOptionText, { color: colors.text }]}
+                    >
+                      {subject.name}
+                    </Text>
+                  </View>
+                  {selectedSubject.id === subject.id && (
+                    <Ionicons
+                      name="checkmark"
+                      size={24}
+                      color={subject.color}
+                    />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -355,7 +522,37 @@ const styles = StyleSheet.create({
     gap: 16,
     width: "100%",
     maxWidth: 400,
-    marginBottom: 40,
+    marginBottom: 24,
+  },
+  subjectContainer: {
+    width: "100%",
+    maxWidth: 400,
+    marginBottom: 32,
+  },
+  subjectLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  subjectSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  subjectText: {
+    fontSize: 16,
+    fontWeight: "600",
+    flex: 1,
   },
   primaryButton: {
     flex: 1,
@@ -408,5 +605,55 @@ const styles = StyleSheet.create({
   progressFill: {
     height: "100%",
     borderRadius: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 20,
+    paddingBottom: 40,
+    maxHeight: "70%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 24,
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+  },
+  subjectList: {
+    paddingHorizontal: 24,
+  },
+  subjectOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+  },
+  subjectOptionLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  subjectIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  subjectOptionText: {
+    fontSize: 17,
+    fontWeight: "600",
   },
 });

@@ -284,19 +284,34 @@ export default function HomeScreen() {
       newTargets = [...currentTargets, position];
     }
 
-    // Calculate new size
+    // Calculate new size and position
+    const allPositions = [widget.position, ...newTargets];
+    const sortedPositions = allPositions.sort((a, b) => a - b);
+
+    // Calculate bounding box to find top-left position
+    const rows = sortedPositions.map((p) => Math.floor(p / 2));
+    const cols = sortedPositions.map((p) => p % 2);
+    const minRow = Math.min(...rows);
+    const minCol = Math.min(...cols);
+    const newPosition = minRow * 2 + minCol;
+
     const newSize = getSizeFromPositions(widget.position, newTargets);
 
     setResizeState({
       widgetId: resizeState.widgetId,
       targetPositions: newTargets,
       previewSize: newSize || undefined,
+      previewPosition: newPosition,
     });
   };
 
   const handleConfirmResize = () => {
     if (!resizeState?.previewSize || !resizeState.widgetId) return;
-    resizeWidget(resizeState.widgetId, resizeState.previewSize);
+    resizeWidget(
+      resizeState.widgetId,
+      resizeState.previewSize,
+      resizeState.previewPosition
+    );
     setResizeState(null);
   };
 
@@ -376,8 +391,12 @@ export default function HomeScreen() {
     }
 
     // Render preview overlay if size is selected
-    if (previewWidget && previewSize) {
-      const { row, col } = getPositionCoordinates(previewWidget.position);
+    if (
+      previewWidget &&
+      previewSize &&
+      resizeState?.previewPosition !== undefined
+    ) {
+      const { row, col } = getPositionCoordinates(resizeState.previewPosition);
       const left = col * (SLOT_SIZE + GAP);
       const top = row * (SLOT_SIZE + GAP);
 

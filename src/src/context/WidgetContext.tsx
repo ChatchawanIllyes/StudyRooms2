@@ -20,6 +20,7 @@ export interface WidgetConfig {
 interface ResizeState {
   widgetId: string;
   previewSize?: WidgetSize;
+  previewPosition?: number;
   targetPositions?: number[];
 }
 
@@ -28,7 +29,11 @@ interface WidgetContextType {
   addWidget: (type: WidgetType, position: number, size: WidgetSize) => void;
   removeWidget: (id: string) => void;
   moveWidget: (id: string, newPosition: number) => boolean;
-  resizeWidget: (id: string, newSize: WidgetSize) => boolean;
+  resizeWidget: (
+    id: string,
+    newSize: WidgetSize,
+    newPosition?: number
+  ) => boolean;
   isPositionAvailable: (
     position: number,
     size: WidgetSize,
@@ -230,16 +235,25 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
-  const resizeWidget = (id: string, newSize: WidgetSize): boolean => {
+  const resizeWidget = (
+    id: string,
+    newSize: WidgetSize,
+    newPosition?: number
+  ): boolean => {
     const widget = widgets.find((w) => w.id === id);
     if (!widget) return false;
 
-    if (!isPositionAvailable(widget.position, newSize, id)) {
+    const targetPosition =
+      newPosition !== undefined ? newPosition : widget.position;
+
+    if (!isPositionAvailable(targetPosition, newSize, id)) {
       return false;
     }
 
     setWidgets((prev) =>
-      prev.map((w) => (w.id === id ? { ...w, size: newSize } : w))
+      prev.map((w) =>
+        w.id === id ? { ...w, size: newSize, position: targetPosition } : w
+      )
     );
 
     return true;

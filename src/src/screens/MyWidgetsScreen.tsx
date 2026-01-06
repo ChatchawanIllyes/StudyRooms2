@@ -96,6 +96,19 @@ export default function MyWidgetsScreen() {
             Add widgets to customize your home screen
           </Text>
 
+          {/* Installed Badge */}
+          {widgets.length > 0 && (
+            <View
+              style={[styles.installedBadge, { backgroundColor: colors.card }]}
+            >
+              <Ionicons name="checkmark-circle" size={20} color={accentColor} />
+              <Text style={[styles.installedText, { color: colors.text }]}>
+                {widgets.length} widget{widgets.length !== 1 ? "s" : ""}{" "}
+                installed
+              </Text>
+            </View>
+          )}
+
           <View style={styles.widgetGrid}>
             {AVAILABLE_WIDGETS.filter(
               (widget) => !installedWidgets.includes(widget.type)
@@ -113,39 +126,16 @@ export default function MyWidgetsScreen() {
             })}
           </View>
         </View>
-
-        {/* Installed Section (if any) */}
-        {widgets.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Installed on Home
-            </Text>
-            <View
-              style={[styles.installedBadge, { backgroundColor: colors.card }]}
-            >
-              <Ionicons name="checkmark-circle" size={20} color={accentColor} />
-              <Text style={[styles.installedText, { color: colors.text }]}>
-                {widgets.length} widget{widgets.length !== 1 ? "s" : ""}{" "}
-                installed
-              </Text>
-            </View>
-          </View>
-        )}
       </ScrollView>
 
-      {/* Navigation to Marketplace */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => navigation.navigate("WidgetMarketplace")}
-          style={[styles.marketplaceButton, { borderColor: colors.border }]}
-        >
-          <Text style={[styles.marketplaceButtonText, { color: accentColor }]}>
-            Widget Marketplace
-          </Text>
-          <Ionicons name="chevron-forward" size={20} color={accentColor} />
-        </TouchableOpacity>
-      </View>
+      {/* FAB Shopping Cart Button */}
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => navigation.navigate("WidgetMarketplace")}
+        style={[styles.fab, { backgroundColor: accentColor }]}
+      >
+        <Ionicons name="cart" size={28} color="#FFFFFF" />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -193,7 +183,7 @@ const styles = StyleSheet.create({
   },
   sectionDescription: {
     fontSize: 15,
-    marginBottom: 20,
+    marginBottom: 10,
     letterSpacing: -0.2,
   },
   widgetGrid: {
@@ -212,29 +202,27 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 12,
     borderRadius: 10,
+    marginTop: 0,
+    marginBottom: 20,
   },
   installedText: {
     fontSize: 15,
     fontWeight: "500",
     letterSpacing: -0.2,
   },
-  footer: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  marketplaceButton: {
-    flexDirection: "row",
+  fab: {
+    position: "absolute",
+    bottom: 32,
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    gap: 8,
-  },
-  marketplaceButtonText: {
-    fontSize: 17,
-    fontWeight: "600",
-    letterSpacing: -0.4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
 });

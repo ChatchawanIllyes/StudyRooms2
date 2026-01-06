@@ -72,12 +72,11 @@ export default function WidgetTile({
   widgetId,
 }: WidgetTileProps) {
   const { colors, accentColor } = useTheme();
-  const { resizeState, setResizeState, getValidAdjacentSizes, resizeWidget } =
-    useWidgets();
+  const { resizeState, setResizeState } = useWidgets();
   const info = getWidgetInfo(type);
 
-  const isInResizeMode = resizeState?.widgetId === widgetId;
-  const validSizes = isInResizeMode ? getValidAdjacentSizes(widgetId!) : [];
+  // Only in resize mode if this specific widget (with a valid ID) is being resized
+  const isInResizeMode = widgetId ? resizeState?.widgetId === widgetId : false;
 
   // Simple shared values - no refs needed
   const scale = useSharedValue(1);
@@ -136,25 +135,6 @@ export default function WidgetTile({
     setResizeState({ widgetId });
   };
 
-  const handleSizeSelect = (newSize: WidgetSize) => {
-    if (!resizeState) return;
-    setResizeState({ ...resizeState, previewSize: newSize });
-  };
-
-  const handleConfirmResize = () => {
-    if (!resizeState?.previewSize || !widgetId) return;
-    resizeWidget(widgetId, resizeState.previewSize);
-    setResizeState(null);
-  };
-
-  const handleCancelResize = () => {
-    setResizeState(null);
-  };
-
-  const getSizeLabel = (widgetSize: WidgetSize): string => {
-    return widgetSize.replace("x", "×");
-  };
-
   return (
     <Animated.View style={[animatedStyle]}>
       <TouchableOpacity
@@ -197,99 +177,6 @@ export default function WidgetTile({
             >
               <Ionicons name="expand-outline" size={14} color="#ffffff" />
             </TouchableOpacity>
-          </>
-        )}
-
-        {/* Resize Mode UI */}
-        {isInResizeMode && (
-          <>
-            <View style={styles.resizeModeOverlay}>
-              <View
-                style={[
-                  styles.sizeOptionsContainer,
-                  { backgroundColor: colors.card },
-                ]}
-              >
-                <Text style={[styles.sizeOptionsTitle, { color: colors.text }]}>
-                  Resize to:
-                </Text>
-                <View style={styles.sizeOptions}>
-                  {validSizes.map((validSize) => (
-                    <TouchableOpacity
-                      key={validSize}
-                      style={[
-                        styles.sizeOption,
-                        {
-                          backgroundColor:
-                            resizeState?.previewSize === validSize
-                              ? accentColor
-                              : colors.background,
-                          borderColor:
-                            resizeState?.previewSize === validSize
-                              ? accentColor
-                              : colors.border,
-                        },
-                      ]}
-                      onPress={() => handleSizeSelect(validSize)}
-                    >
-                      <Text
-                        style={[
-                          styles.sizeOptionText,
-                          {
-                            color:
-                              resizeState?.previewSize === validSize
-                                ? "#ffffff"
-                                : colors.text,
-                          },
-                        ]}
-                      >
-                        {getSizeLabel(validSize)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <View style={styles.resizeActions}>
-                  <TouchableOpacity
-                    style={[
-                      styles.resizeActionButton,
-                      { backgroundColor: colors.background },
-                    ]}
-                    onPress={handleCancelResize}
-                  >
-                    <Text
-                      style={[styles.resizeActionText, { color: colors.text }]}
-                    >
-                      Cancel
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.resizeActionButton,
-                      {
-                        backgroundColor: resizeState?.previewSize
-                          ? accentColor
-                          : colors.border,
-                      },
-                    ]}
-                    onPress={handleConfirmResize}
-                    disabled={!resizeState?.previewSize}
-                  >
-                    <Text
-                      style={[
-                        styles.resizeActionText,
-                        {
-                          color: resizeState?.previewSize
-                            ? "#ffffff"
-                            : colors.textSecondary,
-                        },
-                      ]}
-                    >
-                      Confirm
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
           </>
         )}
 
@@ -387,70 +274,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 3,
     elevation: 3,
-  },
-  resizeModeOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 5,
-    padding: 16,
-  },
-  sizeOptionsContainer: {
-    borderRadius: 12,
-    padding: 16,
-    width: "100%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  sizeOptionsTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 12,
-    textAlign: "center",
-    letterSpacing: -0.2,
-  },
-  sizeOptions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 16,
-    justifyContent: "center",
-  },
-  sizeOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    minWidth: 50,
-    alignItems: "center",
-  },
-  sizeOptionText: {
-    fontSize: 14,
-    fontWeight: "600",
-    letterSpacing: -0.2,
-  },
-  resizeActions: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  resizeActionButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  resizeActionText: {
-    fontSize: 15,
-    fontWeight: "600",
-    letterSpacing: -0.2,
   },
 });

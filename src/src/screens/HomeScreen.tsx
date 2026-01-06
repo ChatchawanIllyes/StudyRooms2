@@ -16,12 +16,93 @@ import { useWidgets, WidgetSize } from "../context/WidgetContext";
 import WidgetTile from "../components/WidgetTile";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 
 const { width } = Dimensions.get("window");
 const PADDING = 20;
 const GAP = 16;
 const GRID_WIDTH = width - PADDING * 2;
 const SLOT_SIZE = (GRID_WIDTH - GAP) / 2;
+
+// ResizeSquare component with pulsing animation
+interface ResizeSquareProps {
+  position: number;
+  left: number;
+  top: number;
+  isSelected?: boolean;
+  accentColor: string;
+  onPress: () => void;
+}
+
+function ResizeSquare({ position, left, top, isSelected, accentColor, onPress }: ResizeSquareProps) {
+  const pulseOpacity = useSharedValue(0.3);
+  const pulseScale = useSharedValue(1);
+
+  React.useEffect(() => {
+    if (!isSelected) {
+      pulseOpacity.value = withRepeat(
+        withSequence(
+          withTiming(0.5, { duration: 1000 }),
+          withTiming(0.3, { duration: 1000 })
+        ),
+        -1,
+        false
+      );
+      pulseScale.value = withRepeat(
+        withSequence(
+          withTiming(1.02, { duration: 1000 }),
+          withTiming(1, { duration: 1000 })
+        ),
+        -1,
+        false
+      );
+    } else {
+      pulseOpacity.value = withTiming(0.6);
+      pulseScale.value = withTiming(1);
+    }
+  }, [isSelected]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: pulseOpacity.value,
+    transform: [{ scale: pulseScale.value }],
+  }));
+
+  return (
+    <TouchableOpacity
+      key={`resize-${position}`}
+      style={{
+        position: 'absolute',
+        left,
+        top,
+        width: SLOT_SIZE,
+        height: SLOT_SIZE,
+        zIndex: 3,
+      }}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      <Animated.View
+        style={[
+          {
+            width: '100%',
+            height: '100%',
+            backgroundColor: accentColor,
+            borderRadius: 16,
+            borderWidth: isSelected ? 3 : 2,
+            borderColor: accentColor,
+          },
+          animatedStyle,
+        ]}
+      />
+    </TouchableOpacity>
+  );
+}
 
 export default function HomeScreen() {
   const { colors, accentColor } = useTheme();
@@ -35,7 +116,9 @@ export default function HomeScreen() {
     isEditMode,
     setIsEditMode,
     resizeState,
-    getValidAdjacentSizes,
+    getValidAdjacentPositions,
+    getSizeFromPositions,
+    setResizeState,
   } = useWidgets();
   const [buildPressed, setBuildPressed] = useState(false);
 
@@ -43,7 +126,8 @@ export default function HomeScreen() {
   useFocusEffect(
     React.useCallback(() => {
       setIsEditMode(false);
-    }, [])
+      setResizeState(null);
+    }, [setIsEditMode, setResizeState])
   );
 
   const handleBuildPress = () => {
@@ -51,7 +135,12 @@ export default function HomeScreen() {
   };
 
   const handleEditToggle = () => {
-    setIsEditMode(!isEditMode);
+    const newEditMode = !isEditMode;
+    setIsEditMode(newEditMode);
+    // Clear resize state when exiting edit mode
+    if (!newEditMode) {
+      setResizeState(null);
+    }
   };
 
   const handleWidgetPress = (type: string) => {
@@ -72,7 +161,13 @@ export default function HomeScreen() {
         {
           text: "Remove",
           style: "destructive",
-          onPress: () => removeWidget(id),
+          onPress: () => {
+            // Clear resize state if we're removing the widget being resized
+            if (resizeState?.widgetId === id) {
+              setResizeState(null);
+            }
+            removeWidget(id);
+          },
         },
       ]
     );
@@ -133,6 +228,42 @@ export default function HomeScreen() {
     );
   };
 
+  const handlePositionClick = (position: number) => {
+    if (!resizeState) return;
+
+    const widget = widgets.find(w => w.id === resizeState.widgetId);
+    if (!widget) return;
+
+    const currentTargets = resizeState.targetPositions || [];
+    let newTargets: number[];
+
+    // Toggle position
+    if (currentTargets.includes(position)) {
+      newTargets = currentTargets.filter(p => p !== position);
+    } else {
+      newTargets = [...currentTargets, position];
+    }
+
+    // Calculate new size
+    const newSize = getSizeFromPositions(widget.position, newTargets);
+
+    setResizeState({
+      widgetId: resizeState.widgetId,
+      targetPositions: newTargets,
+      previewSize: newSize || undefined,
+    });
+  };
+
+  const handleConfirmResize = () => {
+    if (!resizeState?.previewSize || !resizeState.widgetId) return;
+    resizeWidget(resizeState.widgetId, resizeState.previewSize);
+    setResizeState(null);
+  };
+
+  const handleCancelResize = () => {
+    setResizeState(null);
+  };
+
   const renderGrid = () => {
     const occupiedPositions = getOccupiedPositions();
 
@@ -140,14 +271,19 @@ export default function HomeScreen() {
     const widgetElements: React.ReactNode[] = [];
     const emptySlots: React.ReactNode[] = [];
     const previewOverlays: React.ReactNode[] = [];
+    const interactiveSquares: React.ReactNode[] = [];
 
     // Get preview info if in resize mode
     let previewWidget: (typeof widgets)[0] | null = null;
     let previewSize: WidgetSize | null = null;
+    let validPositions: number[] = [];
     if (resizeState) {
       previewWidget =
         widgets.find((w) => w.id === resizeState.widgetId) || null;
       previewSize = resizeState.previewSize || null;
+      if (previewWidget) {
+        validPositions = getValidAdjacentPositions(resizeState.widgetId);
+      }
     }
 
     // Render all empty slots first
@@ -175,6 +311,28 @@ export default function HomeScreen() {
           />
         );
       }
+    }
+
+    // Render interactive squares in resize mode
+    if (resizeState && validPositions.length > 0) {
+      validPositions.forEach((pos) => {
+        const { row, col } = getPositionCoordinates(pos);
+        const left = col * (SLOT_SIZE + GAP);
+        const top = row * (SLOT_SIZE + GAP);
+        const isSelected = resizeState.targetPositions?.includes(pos);
+
+        interactiveSquares.push(
+          <ResizeSquare
+            key={`resize-${pos}`}
+            position={pos}
+            left={left}
+            top={top}
+            isSelected={isSelected}
+            accentColor={accentColor}
+            onPress={() => handlePositionClick(pos)}
+          />
+        );
+      });
     }
 
     // Render preview overlay if size is selected
@@ -208,9 +366,9 @@ export default function HomeScreen() {
             width: previewDims.width,
             height: previewDims.height,
             backgroundColor: accentColor,
-            opacity: 0.3,
+            opacity: 0.25,
             borderRadius: 16,
-            borderWidth: 2,
+            borderWidth: 3,
             borderColor: accentColor,
             zIndex: 1,
           }}
@@ -251,8 +409,49 @@ export default function HomeScreen() {
     return (
       <View style={styles.gridWrapper}>
         {emptySlots}
+        {interactiveSquares}
         {previewOverlays}
         {widgetElements}
+        
+        {/* Resize Confirm/Cancel Buttons */}
+        {resizeState && previewWidget && (
+          <View
+            style={[
+              styles.resizeControls,
+              {
+                top: SLOT_SIZE * 3 + GAP * 2 + 16,
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={[styles.resizeControlButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={handleCancelResize}
+            >
+              <Text style={[styles.resizeControlText, { color: colors.text }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.resizeControlButton,
+                {
+                  backgroundColor: resizeState.previewSize ? accentColor : colors.border,
+                },
+              ]}
+              onPress={handleConfirmResize}
+              disabled={!resizeState.previewSize}
+            >
+              <Text
+                style={[
+                  styles.resizeControlText,
+                  { color: resizeState.previewSize ? '#ffffff' : colors.textSecondary },
+                ]}
+              >
+                Confirm
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     );
   };
@@ -385,5 +584,30 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 1,
+  },
+  resizeControls: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    gap: 12,
+    zIndex: 20,
+  },
+  resizeControlButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  resizeControlText: {
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: -0.3,
   },
 });

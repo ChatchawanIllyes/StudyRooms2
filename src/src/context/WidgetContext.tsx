@@ -20,6 +20,7 @@ export interface WidgetConfig {
 interface ResizeState {
   widgetId: string;
   previewSize?: WidgetSize;
+  targetPositions?: number[];
 }
 
 interface WidgetContextType {
@@ -35,6 +36,8 @@ interface WidgetContextType {
   ) => boolean;
   getOccupiedPositions: (excludeId?: string) => Set<number>;
   getValidAdjacentSizes: (id: string) => WidgetSize[];
+  getValidAdjacentPositions: (id: string) => number[];
+  getSizeFromPositions: (basePosition: number, targetPositions: number[]) => WidgetSize | null;
   isEditMode: boolean;
   setIsEditMode: (mode: boolean) => void;
   resizeState: ResizeState | null;
@@ -57,6 +60,13 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     saveWidgets();
   }, [widgets]);
+
+  // Clear resize state if the widget being resized no longer exists
+  useEffect(() => {
+    if (resizeState && !widgets.find(w => w.id === resizeState.widgetId)) {
+      setResizeState(null);
+    }
+  }, [widgets, resizeState]);
 
   const loadWidgets = async () => {
     try {
@@ -213,6 +223,86 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
     return validSizes;
   };
 
+  const getValidAdjacentPositions = (id: string): number[] => {
+    const widget = widgets.find((w) => w.id === id);
+    if (!widget) return [];
+
+    const currentPositions = new Set(getPositionsForSize(widget.position, widget.size));
+    const occupied = getOccupiedPositions(id);
+    const validPositions = new Set<number>();
+
+    // Check all 6 grid positions
+    for (let pos = 0; pos < 6; pos++) {
+      // Skip if already part of current widget
+      if (currentPositions.has(pos)) continue;
+      
+      // Check if position is occupied by another widget
+      if (occupied.has(pos)) continue;
+
+      // Check if position is adjacent (horizontally or vertically)
+      const isAdjacent = Array.from(currentPositions).some((currentPos) => {
+        const currentRow = Math.floor(currentPos / 2);
+        const currentCol = currentPos % 2;
+        const posRow = Math.floor(pos / 2);
+        const posCol = pos % 2;
+
+        // Adjacent if same row and adjacent column, or same column and adjacent row
+        return (
+          (currentRow === posRow && Math.abs(currentCol - posCol) === 1) ||
+          (currentCol === posCol && Math.abs(currentRow - posRow) === 1)
+        );
+      });
+
+      if (isAdjacent) {
+        validPositions.add(pos);
+      }
+    }
+
+    // Also include current positions for shrinking
+    currentPositions.forEach(pos => validPositions.add(pos));
+
+    return Array.from(validPositions);
+  };
+
+  const getSizeFromPositions = (basePosition: number, targetPositions: number[]): WidgetSize | null => {
+    const allPositions = new Set([basePosition, ...targetPositions]);
+    const sortedPositions = Array.from(allPositions).sort((a, b) => a - b);
+
+    // Calculate bounding box
+    const rows = sortedPositions.map(p => Math.floor(p / 2));
+    const cols = sortedPositions.map(p => p % 2);
+    
+    const minRow = Math.min(...rows);
+    const maxRow = Math.max(...rows);
+    const minCol = Math.min(...cols);
+    const maxCol = Math.max(...cols);
+
+    const width = maxCol - minCol + 1;
+    const height = maxRow - minRow + 1;
+
+    // Verify it's a valid rectangle
+    const expectedPositions = new Set<number>();
+    for (let r = minRow; r <= maxRow; r++) {
+      for (let c = minCol; c <= maxCol; c++) {
+        expectedPositions.add(r * 2 + c);
+      }
+    }
+
+    // Check if all positions match
+    if (expectedPositions.size !== allPositions.size) return null;
+    for (const pos of allPositions) {
+      if (!expectedPositions.has(pos)) return null;
+    }
+
+    // Return the size
+    if (width === 1 && height === 1) return "1x1";
+    if (width === 2 && height === 1) return "2x1";
+    if (width === 1 && height === 2) return "1x2";
+    if (width === 2 && height === 2) return "2x2";
+
+    return null;
+  };
+
   return (
     <WidgetContext.Provider
       value={{
@@ -224,6 +314,8 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
         isPositionAvailable,
         getOccupiedPositions,
         getValidAdjacentSizes,
+        getValidAdjacentPositions,
+        getSizeFromPositions,
         isEditMode,
         setIsEditMode,
         resizeState,

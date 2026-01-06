@@ -22,22 +22,22 @@ const AVAILABLE_WIDGETS: Array<{
   description: string;
 }> = [
   {
-    type: 'timer',
-    name: 'Timer',
-    icon: 'timer-outline',
-    description: 'Track your focus sessions with Pomodoro timer',
+    type: "timer",
+    name: "Timer",
+    icon: "timer-outline",
+    description: "Track your focus sessions with Pomodoro timer",
   },
   {
-    type: 'tasks',
-    name: 'Tasks',
-    icon: 'checkbox-outline',
-    description: 'View and manage your study tasks quickly',
+    type: "tasks",
+    name: "Tasks",
+    icon: "checkbox-outline",
+    description: "View and manage your study tasks quickly",
   },
   {
-    type: 'stats',
-    name: 'Stats',
-    icon: 'bar-chart-outline',
-    description: 'See your daily study progress at a glance',
+    type: "stats",
+    name: "Stats",
+    icon: "bar-chart-outline",
+    description: "See your daily study progress at a glance",
   },
 ];
 
@@ -48,7 +48,7 @@ export default function MyWidgetsScreen() {
 
   const handleAddWidget = (widgetType: WidgetType) => {
     const occupiedPositions = getOccupiedPositions();
-    
+
     // Check if grid is full
     if (occupiedPositions.size >= 6) {
       Alert.alert(
@@ -59,10 +59,10 @@ export default function MyWidgetsScreen() {
       return;
     }
 
-    navigation.navigate('PlaceWidget', { widgetType });
+    navigation.navigate("PlaceWidget", { widgetType });
   };
 
-  const installedWidgets = widgets.map(w => w.type);
+  const installedWidgets = widgets.map((w) => w.type);
 
   return (
     <SafeAreaView
@@ -81,13 +81,18 @@ export default function MyWidgetsScreen() {
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+      >
         {/* Available Widgets Section */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             Available Widgets
           </Text>
-          <Text style={[styles.sectionDescription, { color: colors.textSecondary }]}>
+          <Text
+            style={[styles.sectionDescription, { color: colors.textSecondary }]}
+          >
             Add widgets to customize your home screen
           </Text>
 
@@ -113,10 +118,13 @@ export default function MyWidgetsScreen() {
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               Installed on Home
             </Text>
-            <View style={[styles.installedBadge, { backgroundColor: colors.card }]}>
+            <View
+              style={[styles.installedBadge, { backgroundColor: colors.card }]}
+            >
               <Ionicons name="checkmark-circle" size={20} color={accentColor} />
               <Text style={[styles.installedText, { color: colors.text }]}>
-                {widgets.length} widget{widgets.length !== 1 ? 's' : ''} installed
+                {widgets.length} widget{widgets.length !== 1 ? "s" : ""}{" "}
+                installed
               </Text>
             </View>
           </View>
@@ -145,9 +153,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingTop: Platform.OS === "ios" ? 8 : 16,
     paddingBottom: 16,
@@ -155,8 +163,8 @@ const styles = StyleSheet.create({
   backButton: {
     width: 44,
     height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   title: {
     fontSize: 17,
@@ -177,7 +185,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 4,
     letterSpacing: -0.4,
   },
@@ -187,25 +195,25 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   widgetGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     marginHorizontal: -8,
   },
   widgetGridItem: {
-    width: '50%',
+    width: "50%",
     paddingHorizontal: 8,
     marginBottom: 16,
   },
   installedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     padding: 12,
     borderRadius: 10,
   },
   installedText: {
     fontSize: 15,
-    fontWeight: '500',
+    fontWeight: "500",
     letterSpacing: -0.2,
   },
   footer: {

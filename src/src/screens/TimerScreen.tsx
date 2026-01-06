@@ -72,7 +72,7 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
   const [selectedDuration, setSelectedDuration] = useState(25); // default 25 min
   const [showDurationPicker, setShowDurationPicker] = useState(false);
 
-  const [appStateValue, setAppStateValue] = useState<AppStateStatus>('active');
+  const [appStateValue, setAppStateValue] = useState<AppStateStatus>("active");
   const backgroundTimeRef = useRef<number>(0);
   const notificationIdRef = useRef<string | null>(null);
 
@@ -105,7 +105,7 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
 
       // Audio functionality removed - expo-av deprecated
       // TODO: Implement with expo-audio when needed
-      console.log('Timer completed!');
+      console.log("Timer completed!");
     } catch (error) {
       console.error("Error playing sound:", error);
     }

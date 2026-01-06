@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   Dimensions,
   ScrollView,
   Modal,
+  AppState,
+  AppStateStatus,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -68,6 +70,12 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
     DEFAULT_SUBJECTS[0]
   );
   const [showSubjectPicker, setShowSubjectPicker] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [recentSessions, setRecentSessions] = useState<StudySession[]>([]);
+
+  const appState = useRef(AppState.currentState);
+  const backgroundTimeRef = useRef<number>(0);
+  const notificationIdRef = useRef<string | null>(null);
 
   const loadDailyGoal = async () => {
     try {
@@ -95,8 +103,80 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
     React.useCallback(() => {
       loadDailyGoal();
       loadBreakDuration();
+      loadRecentSessions();
     }, [])
   );
+
+  const requestNotificationPermissions = async () => {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== "granted") {
+      await Notifications.requestPermissionsAsync();
+    }
+  };
+
+  const loadRecentSessions = async () => {
+    try {
+      const sessions = await AsyncStorage.getItem("studySessions");
+      if (sessions) {
+        const allSessions: StudySession[] = JSON.parse(sessions);
+        // Get last 5 sessions
+        setRecentSessions(allSessions.slice(-5).reverse());
+      }
+    } catch (error) {
+      console.error("Error loading recent sessions:", error);
+    }
+  };
+
+  // Background timer support
+  useEffect(() => {
+    const subscription = AppState.addEventListener(
+      "change",
+      handleAppStateChange
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, [state, mode, seconds]);
+
+  const handleAppStateChange = (nextAppState: AppStateStatus) => {
+    if (
+      appState.current.match(/inactive|background/) &&
+      nextAppState === "active"
+    ) {
+      // App has come to foreground
+      if (state === "running" && backgroundTimeRef.current > 0) {
+        const elapsedSeconds = Math.floor(
+          (Date.now() - backgroundTimeRef.current) / 1000
+        );
+
+        setSeconds((prev) => {
+          if (mode === "focus") {
+            return prev + elapsedSeconds;
+          } else {
+            // Break mode: count down
+            const newTime = prev - elapsedSeconds;
+            if (newTime <= 0) {
+              setState("idle");
+              return 0;
+            }
+            return newTime;
+          }
+        });
+        backgroundTimeRef.current = 0;
+      }
+    } else if (
+      appState.current === "active" &&
+      nextAppState.match(/inactive|background/)
+    ) {
+      // App has gone to background
+      if (state === "running") {
+        backgroundTimeRef.current = Date.now();
+      }
+    }
+
+    appState.current = nextAppState;
+  };
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -194,9 +274,40 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
 
       // Save back to storage
       await AsyncStorage.setItem("studySessions", JSON.stringify(sessions));
+
+      // Reload recent sessions
+      loadRecentSessions();
     } catch (error) {
       console.error("Error saving study session:", error);
     }
+  };
+
+  const formatDuration = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) {
+      return `${hours}h ${mins}m`;
+    }
+    return `${mins}m`;
+  };
+
+  const getSubjectByIdName = (id: string) => {
+    return DEFAULT_SUBJECTS.find((s) => s.id === id) || DEFAULT_SUBJECTS[0];
+  };
+
+  const formatTimeAgo = (date: Date) => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
   };
 
   const progress = Math.min((todayMinutes / dailyGoal) * 100, 100);
@@ -388,6 +499,78 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
                 ]}
               />
             </View>
+          </View>
+        )}
+
+        {/* Recent Sessions */}
+        {mode === "focus" && recentSessions.length > 0 && (
+          <View style={styles.historyContainer}>
+            <TouchableOpacity
+              style={styles.historyHeader}
+              onPress={() => setShowHistory(!showHistory)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.historyTitle, { color: colors.text }]}>
+                Recent Sessions
+              </Text>
+              <Ionicons
+                name={showHistory ? "chevron-up" : "chevron-down"}
+                size={20}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+
+            {showHistory && (
+              <View style={styles.sessionsList}>
+                {recentSessions.map((session, index) => {
+                  const subject = getSubjectByIdName(session.subject);
+                  const date = new Date(session.date);
+                  const timeAgo = formatTimeAgo(date);
+
+                  return (
+                    <View
+                      key={index}
+                      style={[
+                        styles.sessionItem,
+                        { backgroundColor: colors.card },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.sessionIconSmall,
+                          { backgroundColor: subject.color },
+                        ]}
+                      >
+                        <Ionicons name={subject.icon} size={16} color="white" />
+                      </View>
+                      <View style={styles.sessionInfo}>
+                        <Text
+                          style={[
+                            styles.sessionSubject,
+                            { color: colors.text },
+                          ]}
+                        >
+                          {subject.name}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.sessionTime,
+                            { color: colors.textSecondary },
+                          ]}
+                        >
+                          {timeAgo}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[styles.sessionDuration, { color: colors.text }]}
+                      >
+                        {formatDuration(session.duration)}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
         )}
       </View>
@@ -605,6 +788,53 @@ const styles = StyleSheet.create({
   progressFill: {
     height: "100%",
     borderRadius: 4,
+  },
+  historyContainer: {
+    width: "100%",
+    maxWidth: 400,
+    marginTop: 24,
+  },
+  historyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  historyTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  sessionsList: {
+    gap: 8,
+  },
+  sessionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 12,
+    gap: 12,
+  },
+  sessionIconSmall: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sessionInfo: {
+    flex: 1,
+  },
+  sessionSubject: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  sessionTime: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  sessionDuration: {
+    fontSize: 15,
+    fontWeight: "600",
   },
   modalOverlay: {
     flex: 1,

@@ -97,7 +97,9 @@ export default function MyWidgetsScreen() {
           </Text>
 
           <View style={styles.widgetGrid}>
-            {AVAILABLE_WIDGETS.map((widget) => {
+            {AVAILABLE_WIDGETS.filter(
+              (widget) => !installedWidgets.includes(widget.type)
+            ).map((widget) => {
               return (
                 <View key={widget.type} style={styles.widgetGridItem}>
                   <WidgetTile

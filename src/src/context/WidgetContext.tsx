@@ -37,24 +37,36 @@ interface WidgetContextType {
   getOccupiedPositions: (excludeId?: string) => Set<number>;
   getValidAdjacentSizes: (id: string) => WidgetSize[];
   getValidAdjacentPositions: (id: string) => number[];
-  getSizeFromPositions: (basePosition: number, targetPositions: number[]) => WidgetSize | null;
+  getSizeFromPositions: (
+    basePosition: number,
+    targetPositions: number[]
+  ) => WidgetSize | null;
   isEditMode: boolean;
   setIsEditMode: (mode: boolean) => void;
   resizeState: ResizeState | null;
   setResizeState: (state: ResizeState | null) => void;
+  homeTitle: string;
+  setHomeTitle: (title: string) => void;
+  homeDescription: string;
+  setHomeDescription: (description: string) => void;
 }
 
 const WidgetContext = createContext<WidgetContextType | undefined>(undefined);
 
 const STORAGE_KEY = "studyapp_widgets";
+const HOME_TITLE_KEY = "studyapp_home_title";
+const HOME_DESCRIPTION_KEY = "studyapp_home_description";
 
 export function WidgetProvider({ children }: { children: ReactNode }) {
   const [widgets, setWidgets] = useState<WidgetConfig[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
+  const [homeTitle, setHomeTitle] = useState("Home");
+  const [homeDescription, setHomeDescription] = useState("Your study space");
 
   useEffect(() => {
     loadWidgets();
+    loadHomeCustomization();
   }, []);
 
   useEffect(() => {
@@ -63,7 +75,7 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
 
   // Clear resize state if the widget being resized no longer exists
   useEffect(() => {
-    if (resizeState && !widgets.find(w => w.id === resizeState.widgetId)) {
+    if (resizeState && !widgets.find((w) => w.id === resizeState.widgetId)) {
       setResizeState(null);
     }
   }, [widgets, resizeState]);
@@ -84,6 +96,35 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(widgets));
     } catch (error) {
       console.error("Failed to save widgets:", error);
+    }
+  };
+
+  const loadHomeCustomization = async () => {
+    try {
+      const title = await AsyncStorage.getItem(HOME_TITLE_KEY);
+      const description = await AsyncStorage.getItem(HOME_DESCRIPTION_KEY);
+      if (title) setHomeTitle(title);
+      if (description) setHomeDescription(description);
+    } catch (error) {
+      console.error("Failed to load home customization:", error);
+    }
+  };
+
+  const saveHomeTitle = async (title: string) => {
+    try {
+      setHomeTitle(title);
+      await AsyncStorage.setItem(HOME_TITLE_KEY, title);
+    } catch (error) {
+      console.error("Failed to save home title:", error);
+    }
+  };
+
+  const saveHomeDescription = async (description: string) => {
+    try {
+      setHomeDescription(description);
+      await AsyncStorage.setItem(HOME_DESCRIPTION_KEY, description);
+    } catch (error) {
+      console.error("Failed to save home description:", error);
     }
   };
 
@@ -227,7 +268,9 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
     const widget = widgets.find((w) => w.id === id);
     if (!widget) return [];
 
-    const currentPositions = new Set(getPositionsForSize(widget.position, widget.size));
+    const currentPositions = new Set(
+      getPositionsForSize(widget.position, widget.size)
+    );
     const occupied = getOccupiedPositions(id);
     const validPositions = new Set<number>();
 
@@ -235,7 +278,7 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
     for (let pos = 0; pos < 6; pos++) {
       // Skip if already part of current widget
       if (currentPositions.has(pos)) continue;
-      
+
       // Check if position is occupied by another widget
       if (occupied.has(pos)) continue;
 
@@ -259,19 +302,22 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
     }
 
     // Also include current positions for shrinking
-    currentPositions.forEach(pos => validPositions.add(pos));
+    currentPositions.forEach((pos) => validPositions.add(pos));
 
     return Array.from(validPositions);
   };
 
-  const getSizeFromPositions = (basePosition: number, targetPositions: number[]): WidgetSize | null => {
+  const getSizeFromPositions = (
+    basePosition: number,
+    targetPositions: number[]
+  ): WidgetSize | null => {
     const allPositions = new Set([basePosition, ...targetPositions]);
     const sortedPositions = Array.from(allPositions).sort((a, b) => a - b);
 
     // Calculate bounding box
-    const rows = sortedPositions.map(p => Math.floor(p / 2));
-    const cols = sortedPositions.map(p => p % 2);
-    
+    const rows = sortedPositions.map((p) => Math.floor(p / 2));
+    const cols = sortedPositions.map((p) => p % 2);
+
     const minRow = Math.min(...rows);
     const maxRow = Math.max(...rows);
     const minCol = Math.min(...cols);
@@ -320,6 +366,10 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
         setIsEditMode,
         resizeState,
         setResizeState,
+        homeTitle,
+        setHomeTitle: saveHomeTitle,
+        homeDescription,
+        setHomeDescription: saveHomeDescription,
       }}
     >
       {children}

@@ -8,6 +8,7 @@ import {
   Platform,
   Alert,
   ActionSheetIOS,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../context/ThemeContext";
@@ -22,7 +23,7 @@ import Animated, {
   withRepeat,
   withSequence,
   withTiming,
-} from 'react-native-reanimated';
+} from "react-native-reanimated";
 
 const { width } = Dimensions.get("window");
 const PADDING = 20;
@@ -40,7 +41,14 @@ interface ResizeSquareProps {
   onPress: () => void;
 }
 
-function ResizeSquare({ position, left, top, isSelected, accentColor, onPress }: ResizeSquareProps) {
+function ResizeSquare({
+  position,
+  left,
+  top,
+  isSelected,
+  accentColor,
+  onPress,
+}: ResizeSquareProps) {
   const pulseOpacity = useSharedValue(0.3);
   const pulseScale = useSharedValue(1);
 
@@ -77,7 +85,7 @@ function ResizeSquare({ position, left, top, isSelected, accentColor, onPress }:
     <TouchableOpacity
       key={`resize-${position}`}
       style={{
-        position: 'absolute',
+        position: "absolute",
         left,
         top,
         width: SLOT_SIZE,
@@ -90,8 +98,8 @@ function ResizeSquare({ position, left, top, isSelected, accentColor, onPress }:
       <Animated.View
         style={[
           {
-            width: '100%',
-            height: '100%',
+            width: "100%",
+            height: "100%",
             backgroundColor: accentColor,
             borderRadius: 16,
             borderWidth: isSelected ? 3 : 2,
@@ -119,8 +127,16 @@ export default function HomeScreen() {
     getValidAdjacentPositions,
     getSizeFromPositions,
     setResizeState,
+    homeTitle,
+    setHomeTitle,
+    homeDescription,
+    setHomeDescription,
   } = useWidgets();
   const [buildPressed, setBuildPressed] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [tempTitle, setTempTitle] = useState(homeTitle);
+  const [tempDescription, setTempDescription] = useState(homeDescription);
 
   // Reset edit mode when screen comes into focus
   useFocusEffect(
@@ -129,6 +145,30 @@ export default function HomeScreen() {
       setResizeState(null);
     }, [setIsEditMode, setResizeState])
   );
+
+  const handleTitleEdit = () => {
+    setTempTitle(homeTitle);
+    setIsEditingTitle(true);
+  };
+
+  const handleTitleSave = () => {
+    if (tempTitle.trim()) {
+      setHomeTitle(tempTitle.trim().slice(0, 20));
+    }
+    setIsEditingTitle(false);
+  };
+
+  const handleDescriptionEdit = () => {
+    setTempDescription(homeDescription);
+    setIsEditingDescription(true);
+  };
+
+  const handleDescriptionSave = () => {
+    if (tempDescription.trim()) {
+      setHomeDescription(tempDescription.trim().slice(0, 50));
+    }
+    setIsEditingDescription(false);
+  };
 
   const handleBuildPress = () => {
     navigation.navigate("MyWidgets");
@@ -231,7 +271,7 @@ export default function HomeScreen() {
   const handlePositionClick = (position: number) => {
     if (!resizeState) return;
 
-    const widget = widgets.find(w => w.id === resizeState.widgetId);
+    const widget = widgets.find((w) => w.id === resizeState.widgetId);
     if (!widget) return;
 
     const currentTargets = resizeState.targetPositions || [];
@@ -239,7 +279,7 @@ export default function HomeScreen() {
 
     // Toggle position
     if (currentTargets.includes(position)) {
-      newTargets = currentTargets.filter(p => p !== position);
+      newTargets = currentTargets.filter((p) => p !== position);
     } else {
       newTargets = [...currentTargets, position];
     }
@@ -412,7 +452,7 @@ export default function HomeScreen() {
         {interactiveSquares}
         {previewOverlays}
         {widgetElements}
-        
+
         {/* Resize Confirm/Cancel Buttons */}
         {resizeState && previewWidget && (
           <View
@@ -424,7 +464,10 @@ export default function HomeScreen() {
             ]}
           >
             <TouchableOpacity
-              style={[styles.resizeControlButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+              style={[
+                styles.resizeControlButton,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
               onPress={handleCancelResize}
             >
               <Text style={[styles.resizeControlText, { color: colors.text }]}>
@@ -435,7 +478,9 @@ export default function HomeScreen() {
               style={[
                 styles.resizeControlButton,
                 {
-                  backgroundColor: resizeState.previewSize ? accentColor : colors.border,
+                  backgroundColor: resizeState.previewSize
+                    ? accentColor
+                    : colors.border,
                 },
               ]}
               onPress={handleConfirmResize}
@@ -444,7 +489,11 @@ export default function HomeScreen() {
               <Text
                 style={[
                   styles.resizeControlText,
-                  { color: resizeState.previewSize ? '#ffffff' : colors.textSecondary },
+                  {
+                    color: resizeState.previewSize
+                      ? "#ffffff"
+                      : colors.textSecondary,
+                  },
                 ]}
               >
                 Confirm
@@ -464,11 +513,54 @@ export default function HomeScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <View>
-            <Text style={[styles.title, { color: colors.text }]}>Home</Text>
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Build your study space
-            </Text>
+          <View style={styles.headerText}>
+            {isEditingTitle ? (
+              <TextInput
+                style={[
+                  styles.titleInput,
+                  { color: colors.text, borderColor: accentColor },
+                ]}
+                value={tempTitle}
+                onChangeText={(text) => setTempTitle(text.slice(0, 20))}
+                onBlur={handleTitleSave}
+                autoFocus
+                maxLength={20}
+                placeholder="Home"
+                placeholderTextColor={colors.textSecondary}
+              />
+            ) : (
+              <TouchableOpacity onPress={handleTitleEdit} activeOpacity={0.7}>
+                <Text style={[styles.title, { color: colors.text }]}>
+                  {homeTitle}
+                </Text>
+              </TouchableOpacity>
+            )}
+            {isEditingDescription ? (
+              <TextInput
+                style={[
+                  styles.descriptionInput,
+                  { color: colors.textSecondary, borderColor: accentColor },
+                ]}
+                value={tempDescription}
+                onChangeText={(text) => setTempDescription(text.slice(0, 50))}
+                onBlur={handleDescriptionSave}
+                autoFocus
+                maxLength={50}
+                placeholder="Your study space"
+                placeholderTextColor={colors.textSecondary}
+              />
+            ) : (
+              <TouchableOpacity
+                onPress={handleDescriptionEdit}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[styles.subtitle, { color: colors.textSecondary }]}
+                >
+                  {homeDescription}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
           <View style={styles.headerButtons}>
             {widgets.length > 0 && (
@@ -586,10 +678,10 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   resizeControls: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     right: 0,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     zIndex: 20,
   },
@@ -597,9 +689,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
     borderWidth: 1.5,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -607,7 +699,28 @@ const styles = StyleSheet.create({
   },
   resizeControlText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     letterSpacing: -0.3,
+  },
+  headerText: {
+    flex: 1,
+  },
+  titleInput: {
+    fontSize: 28,
+    fontWeight: "700",
+    letterSpacing: -0.5,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  descriptionInput: {
+    fontSize: 15,
+    letterSpacing: -0.2,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderRadius: 8,
   },
 });

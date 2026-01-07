@@ -127,14 +127,19 @@ export default function MyWidgetsScreen() {
               (widget) => !installedWidgets.includes(widget.type)
             ).map((widget) => {
               return (
-                <View key={widget.type} style={styles.widgetGridItem}>
+                <TouchableOpacity
+                  key={widget.type}
+                  activeOpacity={0.7}
+                  onPress={() => handleAddWidget(widget.type)}
+                  style={styles.widgetGridItem}
+                >
                   <WidgetTile
                     type={widget.type}
                     size="1x1"
                     isEditMode={false}
-                    onPress={() => handleAddWidget(widget.type)}
+                    isPreview={true}
                   />
-                </View>
+                </TouchableOpacity>
               );
             })}
           </View>
@@ -196,7 +201,7 @@ const styles = StyleSheet.create({
   },
   sectionDescription: {
     fontSize: 15,
-    marginBottom: 10,
+    marginBottom: 20,
     letterSpacing: -0.2,
   },
   widgetGrid: {

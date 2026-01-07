@@ -21,6 +21,7 @@ import RoomsNavigator from "./src/screens/RoomsNavigator";
 import SettingsScreen from "./src/screens/SettingsScreen";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
 import { WidgetProvider } from "./src/context/WidgetContext";
+import { StudyTimerProvider } from "./src/context/StudyTimerContext";
 
 const Tab = createBottomTabNavigator();
 
@@ -104,7 +105,9 @@ export default function App() {
   return (
     <ThemeProvider>
       <WidgetProvider>
-        <AppContent />
+        <StudyTimerProvider>
+          <AppContent />
+        </StudyTimerProvider>
       </WidgetProvider>
     </ThemeProvider>
   );

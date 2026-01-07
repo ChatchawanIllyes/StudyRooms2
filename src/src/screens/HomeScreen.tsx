@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../context/ThemeContext";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useWidgets, WidgetSize } from "../context/WidgetContext";
+import { useStudyTimer } from "../context/StudyTimerContext";
 import WidgetTile from "../components/WidgetTile";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
@@ -115,6 +116,7 @@ function ResizeSquare({
 export default function HomeScreen() {
   const { colors, accentColor } = useTheme();
   const navigation = useNavigation<any>();
+  const { reset: resetTimer } = useStudyTimer();
   const {
     widgets,
     addWidget,
@@ -227,10 +229,19 @@ export default function HomeScreen() {
           text: "Remove",
           style: "destructive",
           onPress: () => {
+            // Find the widget to check its type
+            const widget = widgets.find((w) => w.id === id);
+
             // Clear resize state if we're removing the widget being resized
             if (resizeState?.widgetId === id) {
               setResizeState(null);
             }
+
+            // Reset timer if removing a timer widget
+            if (widget?.type === "timer") {
+              resetTimer();
+            }
+
             removeWidget(id);
           },
         },
@@ -745,39 +756,43 @@ export default function HomeScreen() {
                     </View>
                   </TouchableOpacity>
                 )}
-                {isEditingDescription ? (
-                  <TextInput
-                    style={[
-                      styles.descriptionInput,
-                      { color: colors.textSecondary, borderColor: accentColor },
-                    ]}
-                    value={tempDescription}
-                    onChangeText={(text) =>
-                      setTempDescription(text.slice(0, 50))
-                    }
-                    onBlur={handleDescriptionSave}
-                    autoFocus
-                    maxLength={50}
-                    placeholder="Your study space"
-                    placeholderTextColor={colors.textSecondary}
-                  />
-                ) : (
-                  <TouchableOpacity
-                    onPress={handleDescriptionEdit}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.editableTextContainer}>
-                      <Text
-                        style={[
-                          styles.subtitle,
-                          { color: colors.textSecondary },
-                        ]}
-                      >
-                        {homeDescription}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                )}
+                {!placementMode &&
+                  (isEditingDescription ? (
+                    <TextInput
+                      style={[
+                        styles.descriptionInput,
+                        {
+                          color: colors.textSecondary,
+                          borderColor: accentColor,
+                        },
+                      ]}
+                      value={tempDescription}
+                      onChangeText={(text) =>
+                        setTempDescription(text.slice(0, 50))
+                      }
+                      onBlur={handleDescriptionSave}
+                      autoFocus
+                      maxLength={50}
+                      placeholder="Your study space"
+                      placeholderTextColor={colors.textSecondary}
+                    />
+                  ) : (
+                    <TouchableOpacity
+                      onPress={handleDescriptionEdit}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.editableTextContainer}>
+                        <Text
+                          style={[
+                            styles.subtitle,
+                            { color: colors.textSecondary },
+                          ]}
+                        >
+                          {homeDescription}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
               </View>
               {!placementMode && (
                 <View style={styles.headerButtons}>

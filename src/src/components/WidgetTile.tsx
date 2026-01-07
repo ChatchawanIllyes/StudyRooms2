@@ -9,6 +9,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import { WidgetType, WidgetSize, useWidgets } from "../context/WidgetContext";
+import TimerWidget from "./TimerWidget";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -33,6 +34,7 @@ interface WidgetTileProps {
   onResize?: () => void;
   isEditMode?: boolean;
   widgetId?: string;
+  isPreview?: boolean;
 }
 
 const getWidgetInfo = (type: WidgetType) => {
@@ -70,6 +72,7 @@ export default function WidgetTile({
   onResize,
   isEditMode = false,
   widgetId,
+  isPreview = false,
 }: WidgetTileProps) {
   const { colors, accentColor } = useTheme();
   const { resizeState, setResizeState } = useWidgets();
@@ -135,8 +138,66 @@ export default function WidgetTile({
     setResizeState({ widgetId });
   };
 
+  // If timer widget, render TimerWidget component instead
+  if (type === "timer") {
+    return (
+      <Animated.View style={[animatedStyle]}>
+        <View
+          style={[
+            {
+              width: dimensions.width,
+              height: dimensions.height,
+              backgroundColor: colors.card,
+              borderColor:
+                isEditMode || isInResizeMode ? accentColor : "transparent",
+              borderWidth: 2,
+              borderRadius: 16,
+              overflow: "visible",
+            },
+          ]}
+        >
+          {/* Edit Mode Controls */}
+          {isEditMode && !isInResizeMode && (
+            <>
+              <TouchableOpacity
+                style={[styles.removeButton, { backgroundColor: "#ff3b30" }]}
+                onPress={onRemove}
+              >
+                <Ionicons name="close" size={16} color="#ffffff" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.resizeButton,
+                  {
+                    backgroundColor: "rgba(0, 0, 0, 0.75)",
+                    borderWidth: 2,
+                    borderColor: "rgba(255, 255, 255, 0.3)",
+                  },
+                ]}
+                onPress={handleResizePress}
+              >
+                <Ionicons name="expand-outline" size={14} color="#ffffff" />
+              </TouchableOpacity>
+            </>
+          )}
+
+          <TimerWidget
+            size={size}
+            isEditMode={isEditMode || isInResizeMode}
+            onNavigateToTimer={() => onPress?.()}
+            isPreview={isPreview}
+          />
+        </View>
+      </Animated.View>
+    );
+  }
+
   return (
-    <Animated.View style={[animatedStyle]}>
+    <Animated.View
+      style={[animatedStyle]}
+      pointerEvents={isPreview ? "none" : "auto"}
+    >
       <TouchableOpacity
         activeOpacity={isEditMode || isInResizeMode ? 1 : 0.7}
         onPress={isEditMode || isInResizeMode ? undefined : onPress}
@@ -154,6 +215,22 @@ export default function WidgetTile({
           },
         ]}
       >
+        {/* Widget Title Badge for Preview */}
+        {isPreview && (
+          <View
+            style={[
+              styles.titleBadge,
+              {
+                backgroundColor: accentColor,
+                borderWidth: 2,
+                borderColor: colors.background,
+              },
+            ]}
+          >
+            <Text style={styles.titleBadgeText}>{info.name}</Text>
+          </View>
+        )}
+
         {/* Edit Mode Controls */}
         {isEditMode && !isInResizeMode && (
           <>
@@ -213,6 +290,27 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+  },
+  titleBadge: {
+    position: "absolute",
+    top: -14,
+    alignSelf: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 14,
+    zIndex: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  titleBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    color: "#FFFFFF",
   },
   content: {
     flex: 1,

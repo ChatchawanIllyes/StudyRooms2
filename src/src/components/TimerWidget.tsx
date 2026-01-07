@@ -167,7 +167,13 @@ export default function TimerWidget({
             styles.timeText,
             {
               color: colors.text,
-              fontSize: is2x2 ? 48 : size === "1x2" ? 32 : size === "2x1" ? 20 : 28,
+              fontSize: is2x2
+                ? 48
+                : size === "1x2"
+                ? 32
+                : size === "2x1"
+                ? 20
+                : 28,
               letterSpacing: is2x2 ? 3 : 2,
               marginBottom: size === "2x1" ? 16 : 0,
               lineHeight: size === "2x1" ? 20 : undefined,

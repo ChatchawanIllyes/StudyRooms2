@@ -156,28 +156,21 @@ export default function TimerWidget({
         style={[
           styles.topSection,
           {
-            flex: is2x2 ? 6 : is1x1 ? 2.5 : size === "2x1" ? 4 : 5,
-            justifyContent: is1x1 ? "flex-start" : "center",
+            flex: is2x2 ? 6 : is1x1 ? 2.5 : size === "2x1" ? 2 : 5,
+            justifyContent: is1x1 || size === "2x1" ? "flex-start" : "center",
+            paddingTop: size === "2x1" ? 4 : 0,
           },
         ]}
       >
-        {is2x2 && (
-          <Text
-            style={[
-              styles.studyingLabel,
-              { color: colors.textSecondary, opacity: 0.6 },
-            ]}
-          >
-            CURRENTLY STUDYING
-          </Text>
-        )}
         <Text
           style={[
             styles.timeText,
             {
               color: colors.text,
-              fontSize: is2x2 ? 48 : size === "1x2" ? 32 : 28,
+              fontSize: is2x2 ? 48 : size === "1x2" ? 32 : size === "2x1" ? 20 : 28,
               letterSpacing: is2x2 ? 3 : 2,
+              marginBottom: size === "2x1" ? 16 : 0,
+              lineHeight: size === "2x1" ? 20 : undefined,
             },
           ]}
         >
@@ -237,7 +230,7 @@ export default function TimerWidget({
         </View>
 
         {/* Hour Indicator below beads */}
-        {elapsedMs > 0 && (
+        {displayElapsedMs > 0 && (
           <Text
             style={[
               styles.hourIndicator,
@@ -436,12 +429,6 @@ const styles = StyleSheet.create({
   topSection: {
     alignItems: "center",
     justifyContent: "center",
-  },
-  studyingLabel: {
-    fontSize: 10,
-    fontWeight: "600",
-    letterSpacing: 1.5,
-    marginBottom: 8,
   },
   timeText: {
     fontWeight: "700",

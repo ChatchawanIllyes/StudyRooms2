@@ -303,7 +303,7 @@ export default function HomeScreen() {
     const widgetCol = widget.position % 2;
     const posRow = Math.floor(position / 2);
     const posCol = position % 2;
-    
+
     const currentTargets = resizeState.targetPositions || [];
     let newTargets: number[];
     let newSize: WidgetSize | null = null;
@@ -325,7 +325,7 @@ export default function HomeScreen() {
       const minCol = Math.min(...cols);
       newPosition = minRow * 2 + minCol;
       newSize = getSizeFromPositions(widget.position, newTargets);
-    } 
+    }
     // From 1x1 widget - determine size based on where user clicks
     else if (widget.size === "1x1") {
       const rowDiff = posRow - widgetRow;
@@ -357,14 +357,15 @@ export default function HomeScreen() {
     // From 2x1 widget - can expand to 2x2
     else if (widget.size === "2x1") {
       // Get the other position occupied by this 2x1 widget
-      const otherPos = widgetCol === 0 ? widget.position + 1 : widget.position - 1;
-      
+      const otherPos =
+        widgetCol === 0 ? widget.position + 1 : widget.position - 1;
+
       // Check if clicking directly below the 2x1
       if (Math.abs(posRow - widgetRow) === 1) {
         // Need both bottom squares for 2x2
         const bottomLeft = (widgetRow + (posRow > widgetRow ? 1 : -1)) * 2;
         const bottomRight = bottomLeft + 1;
-        
+
         if (position === bottomLeft || position === bottomRight) {
           newTargets = [bottomLeft, bottomRight];
           newPosition = Math.min(widget.position, otherPos, bottomLeft);
@@ -377,13 +378,13 @@ export default function HomeScreen() {
       // Get the other position occupied by this 1x2 widget
       const otherRow = widgetRow + (widget.position < 4 ? 1 : -1);
       const otherPos = otherRow * 2 + widgetCol;
-      
+
       // Check if clicking to the right of the 1x2
       if (Math.abs(posCol - widgetCol) === 1) {
         const rightCol = widgetCol + (posCol > widgetCol ? 1 : -1);
         const rightTop = widgetRow * 2 + rightCol;
         const rightBottom = otherRow * 2 + rightCol;
-        
+
         if (position === rightTop || position === rightBottom) {
           newTargets = [rightTop, rightBottom];
           newPosition = Math.min(widget.position, otherPos, rightTop);

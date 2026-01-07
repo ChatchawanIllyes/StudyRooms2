@@ -301,7 +301,7 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
 
     // Check all 6 grid positions
     for (let pos = 0; pos < 6; pos++) {
-      // Skip if already part of current widget  
+      // Skip if already part of current widget
       if (currentPositions.has(pos)) continue;
 
       // Check if position is occupied by another widget
@@ -334,13 +334,13 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
         else if (widget.size === "2x1") {
           const widgetRow = Math.floor(widget.position / 2);
           const posRow = Math.floor(pos / 2);
-          
+
           // Check if this is directly below the 2x1
           if (Math.abs(posRow - widgetRow) === 1) {
             const posCol = pos % 2;
             const otherCol = posCol === 0 ? 1 : 0;
             const otherPos = posRow * 2 + otherCol;
-            
+
             // Only show if both bottom positions are available
             if (!occupied.has(pos) && !occupied.has(otherPos)) {
               validPositions.add(pos);
@@ -352,18 +352,18 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
         else if (widget.size === "1x2") {
           const widgetCol = widget.position % 2;
           const posCol = pos % 2;
-          
+
           // Check if this is to the right of the 1x2
           if (Math.abs(posCol - widgetCol) === 1) {
             // Get both positions in the 1x2 column
             const widgetPositions = Array.from(currentPositions);
-            const rows = widgetPositions.map(p => Math.floor(p / 2));
-            
-            const rightPositions = rows.map(row => row * 2 + posCol);
-            
+            const rows = widgetPositions.map((p) => Math.floor(p / 2));
+
+            const rightPositions = rows.map((row) => row * 2 + posCol);
+
             // Only show if both right positions are available
-            if (rightPositions.every(p => !occupied.has(p))) {
-              rightPositions.forEach(p => validPositions.add(p));
+            if (rightPositions.every((p) => !occupied.has(p))) {
+              rightPositions.forEach((p) => validPositions.add(p));
             }
           }
         }

@@ -111,9 +111,10 @@ export default function MyWidgetsScreen() {
           )}
 
           {/* Marketplace message when all widgets installed or none available */}
-          {(widgets.length === 3 || AVAILABLE_WIDGETS.filter(
-            (widget) => !installedWidgets.includes(widget.type)
-          ).length === 0) && (
+          {(widgets.length === 3 ||
+            AVAILABLE_WIDGETS.filter(
+              (widget) => !installedWidgets.includes(widget.type)
+            ).length === 0) && (
             <Text
               style={[styles.marketplaceHint, { color: colors.textSecondary }]}
             >
@@ -232,8 +233,8 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: "absolute",
-    bottom: 24,
-    right: 20,
+    bottom: 15,
+    right: 16,
     width: 60,
     height: 60,
     borderRadius: 30,

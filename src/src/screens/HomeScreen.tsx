@@ -180,7 +180,7 @@ export default function HomeScreen() {
 
   const handlePlacementSlotClick = (position: number) => {
     if (!placementMode) return;
-    
+
     // Update preview position
     setPlacementMode({
       ...placementMode,
@@ -190,7 +190,7 @@ export default function HomeScreen() {
 
   const handleConfirmPlacement = () => {
     if (!placementMode || placementMode.previewPosition === null) return;
-    
+
     addWidget(placementMode.widgetType, placementMode.previewPosition, "1x1");
     setPlacementMode(null);
   };
@@ -299,33 +299,114 @@ export default function HomeScreen() {
     const widget = widgets.find((w) => w.id === resizeState.widgetId);
     if (!widget) return;
 
+    const widgetRow = Math.floor(widget.position / 2);
+    const widgetCol = widget.position % 2;
+    const posRow = Math.floor(position / 2);
+    const posCol = position % 2;
+    
     const currentTargets = resizeState.targetPositions || [];
     let newTargets: number[];
+    let newSize: WidgetSize | null = null;
+    let newPosition = widget.position;
 
-    // Toggle position
-    if (currentTargets.includes(position)) {
-      newTargets = currentTargets.filter((p) => p !== position);
-    } else {
-      newTargets = [...currentTargets, position];
+    // If clicking current widget position, do nothing
+    if (position === widget.position) {
+      return;
     }
 
-    // Calculate new size and position
-    const allPositions = [widget.position, ...newTargets];
-    const sortedPositions = allPositions.sort((a, b) => a - b);
+    // If clicking a target that's already selected, deselect it (shrink)
+    if (currentTargets.includes(position)) {
+      newTargets = currentTargets.filter((p) => p !== position);
+      const allPositions = [widget.position, ...newTargets];
+      const sortedPositions = allPositions.sort((a, b) => a - b);
+      const rows = sortedPositions.map((p) => Math.floor(p / 2));
+      const cols = sortedPositions.map((p) => p % 2);
+      const minRow = Math.min(...rows);
+      const minCol = Math.min(...cols);
+      newPosition = minRow * 2 + minCol;
+      newSize = getSizeFromPositions(widget.position, newTargets);
+    } 
+    // From 1x1 widget - determine size based on where user clicks
+    else if (widget.size === "1x1") {
+      const rowDiff = posRow - widgetRow;
+      const colDiff = posCol - widgetCol;
 
-    // Calculate bounding box to find top-left position
-    const rows = sortedPositions.map((p) => Math.floor(p / 2));
-    const cols = sortedPositions.map((p) => p % 2);
-    const minRow = Math.min(...rows);
-    const minCol = Math.min(...cols);
-    const newPosition = minRow * 2 + minCol;
+      // Horizontal (2x1)
+      if (rowDiff === 0 && Math.abs(colDiff) === 1) {
+        newTargets = [position];
+        newPosition = Math.min(widget.position, position);
+        newSize = "2x1";
+      }
+      // Vertical (1x2)
+      else if (colDiff === 0 && Math.abs(rowDiff) === 1) {
+        newTargets = [position];
+        newPosition = Math.min(widget.position, position);
+        newSize = "1x2";
+      }
+      // Diagonal (2x2) - auto-complete the rectangle
+      else if (Math.abs(rowDiff) === 1 && Math.abs(colDiff) === 1) {
+        const pos1 = widgetRow * 2 + posCol; // same row as widget, same col as target
+        const pos2 = posRow * 2 + widgetCol; // same row as target, same col as widget
+        newTargets = [position, pos1, pos2];
+        const minRow = Math.min(widgetRow, posRow);
+        const minCol = Math.min(widgetCol, posCol);
+        newPosition = minRow * 2 + minCol;
+        newSize = "2x2";
+      }
+    }
+    // From 2x1 widget - can expand to 2x2
+    else if (widget.size === "2x1") {
+      // Get the other position occupied by this 2x1 widget
+      const otherPos = widgetCol === 0 ? widget.position + 1 : widget.position - 1;
+      
+      // Check if clicking directly below the 2x1
+      if (Math.abs(posRow - widgetRow) === 1) {
+        // Need both bottom squares for 2x2
+        const bottomLeft = (widgetRow + (posRow > widgetRow ? 1 : -1)) * 2;
+        const bottomRight = bottomLeft + 1;
+        
+        if (position === bottomLeft || position === bottomRight) {
+          newTargets = [bottomLeft, bottomRight];
+          newPosition = Math.min(widget.position, otherPos, bottomLeft);
+          newSize = "2x2";
+        }
+      }
+    }
+    // From 1x2 widget - can expand to 2x2
+    else if (widget.size === "1x2") {
+      // Get the other position occupied by this 1x2 widget
+      const otherRow = widgetRow + (widget.position < 4 ? 1 : -1);
+      const otherPos = otherRow * 2 + widgetCol;
+      
+      // Check if clicking to the right of the 1x2
+      if (Math.abs(posCol - widgetCol) === 1) {
+        const rightCol = widgetCol + (posCol > widgetCol ? 1 : -1);
+        const rightTop = widgetRow * 2 + rightCol;
+        const rightBottom = otherRow * 2 + rightCol;
+        
+        if (position === rightTop || position === rightBottom) {
+          newTargets = [rightTop, rightBottom];
+          newPosition = Math.min(widget.position, otherPos, rightTop);
+          newSize = "2x2";
+        }
+      }
+    }
+    // From 2x2 widget - can shrink to any configuration
+    else if (widget.size === "2x2") {
+      // Already handled at the top with deselect logic
+      newTargets = [position];
+      newSize = getSizeFromPositions(widget.position, newTargets);
+    }
 
-    const newSize = getSizeFromPositions(widget.position, newTargets);
+    // If we couldn't determine a valid resize, return
+    if (!newSize) {
+      return;
+    }
 
     setResizeState({
       widgetId: resizeState.widgetId,
-      targetPositions: newTargets,
-      previewSize: newSize || undefined,
+      targetPositions: newTargets || [],
+      previewSize: newSize,
       previewPosition: newPosition,
     });
   };
@@ -342,6 +423,24 @@ export default function HomeScreen() {
 
   const handleCancelResize = () => {
     setResizeState(null);
+  };
+
+  const handleResetResize = () => {
+    if (!resizeState?.widgetId) return;
+    const widget = widgets.find((w) => w.id === resizeState.widgetId);
+    if (!widget) return;
+
+    // Reset to 1x1 at current position and stay in resize mode
+    const success = resizeWidget(resizeState.widgetId, "1x1", widget.position);
+    if (success) {
+      // Clear the resize state targets/preview but keep the widgetId to show new squares
+      setResizeState({
+        widgetId: resizeState.widgetId,
+        targetPositions: [],
+        previewSize: undefined,
+        previewPosition: undefined,
+      });
+    }
   };
 
   const renderGrid = () => {
@@ -494,7 +593,9 @@ export default function HomeScreen() {
 
     // Render placement preview widget
     if (placementMode && placementMode.previewPosition !== null) {
-      const { row, col } = getPositionCoordinates(placementMode.previewPosition);
+      const { row, col } = getPositionCoordinates(
+        placementMode.previewPosition
+      );
       const left = col * (SLOT_SIZE + GAP);
       const top = row * (SLOT_SIZE + GAP);
 
@@ -517,7 +618,10 @@ export default function HomeScreen() {
           />
           {/* Checkmark button on preview */}
           <TouchableOpacity
-            style={[styles.confirmPlacementButton, { backgroundColor: accentColor }]}
+            style={[
+              styles.confirmPlacementButton,
+              { backgroundColor: accentColor },
+            ]}
             onPress={handleConfirmPlacement}
             activeOpacity={0.8}
           >
@@ -534,7 +638,7 @@ export default function HomeScreen() {
         {previewOverlays}
         {widgetElements}
 
-        {/* Resize Confirm/Cancel Buttons */}
+        {/* Resize Control Buttons */}
         {resizeState && previewWidget && (
           <View
             style={[
@@ -551,9 +655,16 @@ export default function HomeScreen() {
               ]}
               onPress={handleCancelResize}
             >
-              <Text style={[styles.resizeControlText, { color: colors.text }]}>
-                Cancel
-              </Text>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.resizeControlButton,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+              onPress={handleResetResize}
+            >
+              <Ionicons name="refresh" size={24} color={colors.text} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[
@@ -567,18 +678,13 @@ export default function HomeScreen() {
               onPress={handleConfirmResize}
               disabled={!resizeState.previewSize}
             >
-              <Text
-                style={[
-                  styles.resizeControlText,
-                  {
-                    color: resizeState.previewSize
-                      ? "#ffffff"
-                      : colors.textSecondary,
-                  },
-                ]}
-              >
-                Confirm
-              </Text>
+              <Ionicons
+                name="checkmark"
+                size={24}
+                color={
+                  resizeState.previewSize ? "#ffffff" : colors.textSecondary
+                }
+              />
             </TouchableOpacity>
           </View>
         )}
@@ -600,111 +706,124 @@ export default function HomeScreen() {
           <View style={{ flex: 1 }} onStartShouldSetResponder={() => false}>
             {/* Header */}
             <View style={styles.header}>
-          <View style={styles.headerText}>
-            {placementMode ? (
-              <>
-                <Text style={[styles.title, { color: colors.text }]}>
-                  Choose position
-                </Text>
-                <Text
-                  style={[styles.subtitle, { color: colors.textSecondary }]}
-                >
-                  Tap an empty slot
-                </Text>
-              </>
-            ) : isEditingTitle ? (
-              <TextInput
-                style={[
-                  styles.titleInput,
-                  { color: colors.text, borderColor: accentColor },
-                ]}
-                value={tempTitle}
-                onChangeText={(text) => setTempTitle(text.slice(0, 20))}
-                onBlur={handleTitleSave}
-                autoFocus
-                maxLength={20}
-                placeholder="Home"
-                placeholderTextColor={colors.textSecondary}
-              />
-            ) : (
-              <TouchableOpacity onPress={handleTitleEdit} activeOpacity={0.7}>
-                <View style={styles.editableTextContainer}>
-                  <Text style={[styles.title, { color: colors.text }]}>
-                    {homeTitle}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            )}
-            {isEditingDescription ? (
-              <TextInput
-                style={[
-                  styles.descriptionInput,
-                  { color: colors.textSecondary, borderColor: accentColor },
-                ]}
-                value={tempDescription}
-                onChangeText={(text) => setTempDescription(text.slice(0, 50))}
-                onBlur={handleDescriptionSave}
-                autoFocus
-                maxLength={50}
-                placeholder="Your study space"
-                placeholderTextColor={colors.textSecondary}
-              />
-            ) : (
-              <TouchableOpacity
-                onPress={handleDescriptionEdit}
-                activeOpacity={0.7}
-              >
-                <View style={styles.editableTextContainer}>
-                  <Text
-                    style={[styles.subtitle, { color: colors.textSecondary }]}
-                  >
-                    {homeDescription}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            )}
-          </View>
-          {!placementMode && (
-            <View style={styles.headerButtons}>
-              {widgets.length > 0 && (
-                <TouchableOpacity
-                  activeOpacity={0.6}
-                  onPress={handleEditToggle}
-                  style={styles.editButton}
-                >
-                  {isEditMode ? (
-                    <Text style={[styles.editButtonText, { color: accentColor }]}>
-                      Done
+              <View style={styles.headerText}>
+                {placementMode ? (
+                  <>
+                    <Text style={[styles.title, { color: colors.text }]}>
+                      Choose position
                     </Text>
-                  ) : (
-                    <Ionicons
-                      name="hammer-outline"
-                      size={24}
-                      color={accentColor}
-                    />
+                    <Text
+                      style={[styles.subtitle, { color: colors.textSecondary }]}
+                    >
+                      Tap an empty slot
+                    </Text>
+                  </>
+                ) : isEditingTitle ? (
+                  <TextInput
+                    style={[
+                      styles.titleInput,
+                      { color: colors.text, borderColor: accentColor },
+                    ]}
+                    value={tempTitle}
+                    onChangeText={(text) => setTempTitle(text.slice(0, 20))}
+                    onBlur={handleTitleSave}
+                    autoFocus
+                    maxLength={20}
+                    placeholder="Home"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                ) : (
+                  <TouchableOpacity
+                    onPress={handleTitleEdit}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.editableTextContainer}>
+                      <Text style={[styles.title, { color: colors.text }]}>
+                        {homeTitle}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+                {isEditingDescription ? (
+                  <TextInput
+                    style={[
+                      styles.descriptionInput,
+                      { color: colors.textSecondary, borderColor: accentColor },
+                    ]}
+                    value={tempDescription}
+                    onChangeText={(text) =>
+                      setTempDescription(text.slice(0, 50))
+                    }
+                    onBlur={handleDescriptionSave}
+                    autoFocus
+                    maxLength={50}
+                    placeholder="Your study space"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                ) : (
+                  <TouchableOpacity
+                    onPress={handleDescriptionEdit}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.editableTextContainer}>
+                      <Text
+                        style={[
+                          styles.subtitle,
+                          { color: colors.textSecondary },
+                        ]}
+                      >
+                        {homeDescription}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+              </View>
+              {!placementMode && (
+                <View style={styles.headerButtons}>
+                  {widgets.length > 0 && (
+                    <TouchableOpacity
+                      activeOpacity={0.6}
+                      onPress={handleEditToggle}
+                      style={styles.editButton}
+                    >
+                      {isEditMode ? (
+                        <Text
+                          style={[
+                            styles.editButtonText,
+                            { color: accentColor },
+                          ]}
+                        >
+                          Done
+                        </Text>
+                      ) : (
+                        <Ionicons
+                          name="hammer-outline"
+                          size={24}
+                          color={accentColor}
+                        />
+                      )}
+                    </TouchableOpacity>
                   )}
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={0.6}
+                    onPressIn={() => setBuildPressed(true)}
+                    onPressOut={() => setBuildPressed(false)}
+                    onPress={handleBuildPress}
+                    style={[
+                      styles.buildButton,
+                      buildPressed && styles.buildButtonPressed,
+                    ]}
+                  >
+                    <Ionicons name="add" size={28} color={accentColor} />
+                  </TouchableOpacity>
+                </View>
               )}
-              <TouchableOpacity
-                activeOpacity={0.6}
-                onPressIn={() => setBuildPressed(true)}
-                onPressOut={() => setBuildPressed(false)}
-                onPress={handleBuildPress}
-                style={[
-                  styles.buildButton,
-                  buildPressed && styles.buildButtonPressed,
-                ]}
-              >
-                <Ionicons name="add" size={28} color={accentColor} />
-              </TouchableOpacity>
             </View>
-          )}
-        </View>
 
-        {/* Grid Area */}
-        <View style={styles.gridContainer}>{renderGrid()}</View>
-        </View>
-      </TouchableOpacity>
+            {/* Grid Area */}
+            <View style={styles.gridContainer}>{renderGrid()}</View>
+          </View>
+        </TouchableOpacity>
       </SafeAreaView>
     </GestureHandlerRootView>
   );

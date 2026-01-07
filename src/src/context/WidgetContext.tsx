@@ -50,8 +50,13 @@ interface WidgetContextType {
   setIsEditMode: (mode: boolean) => void;
   resizeState: ResizeState | null;
   setResizeState: (state: ResizeState | null) => void;
-  placementMode: { widgetType: WidgetType; previewPosition: number | null } | null;
-  setPlacementMode: (mode: { widgetType: WidgetType; previewPosition: number | null } | null) => void;
+  placementMode: {
+    widgetType: WidgetType;
+    previewPosition: number | null;
+  } | null;
+  setPlacementMode: (
+    mode: { widgetType: WidgetType; previewPosition: number | null } | null
+  ) => void;
   homeTitle: string;
   setHomeTitle: (title: string) => void;
   homeDescription: string;
@@ -68,7 +73,10 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
   const [widgets, setWidgets] = useState<WidgetConfig[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
-  const [placementMode, setPlacementMode] = useState<{ widgetType: WidgetType; previewPosition: number | null } | null>(null);
+  const [placementMode, setPlacementMode] = useState<{
+    widgetType: WidgetType;
+    previewPosition: number | null;
+  } | null>(null);
   const [homeTitle, setHomeTitle] = useState("Home");
   const [homeDescription, setHomeDescription] = useState("Your study space");
 
@@ -293,33 +301,75 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
 
     // Check all 6 grid positions
     for (let pos = 0; pos < 6; pos++) {
-      // Skip if already part of current widget
+      // Skip if already part of current widget  
       if (currentPositions.has(pos)) continue;
 
       // Check if position is occupied by another widget
       if (occupied.has(pos)) continue;
 
-      // Check if position is adjacent (horizontally or vertically)
+      // Check if position is adjacent (horizontally, vertically, or diagonally)
       const isAdjacent = Array.from(currentPositions).some((currentPos) => {
         const currentRow = Math.floor(currentPos / 2);
         const currentCol = currentPos % 2;
         const posRow = Math.floor(pos / 2);
         const posCol = pos % 2;
 
-        // Adjacent if same row and adjacent column, or same column and adjacent row
+        const rowDiff = Math.abs(currentRow - posRow);
+        const colDiff = Math.abs(currentCol - posCol);
+
+        // Adjacent if edge-sharing OR diagonal
         return (
-          (currentRow === posRow && Math.abs(currentCol - posCol) === 1) ||
-          (currentCol === posCol && Math.abs(currentRow - posRow) === 1)
+          (rowDiff === 0 && colDiff === 1) || // same row, adjacent column
+          (rowDiff === 1 && colDiff === 0) || // same column, adjacent row
+          (rowDiff === 1 && colDiff === 1) // diagonal
         );
       });
 
       if (isAdjacent) {
-        validPositions.add(pos);
+        // For 1x1: show all adjacent empty squares
+        if (widget.size === "1x1") {
+          validPositions.add(pos);
+        }
+        // For 2x1: show positions that would create 2x2
+        else if (widget.size === "2x1") {
+          const widgetRow = Math.floor(widget.position / 2);
+          const posRow = Math.floor(pos / 2);
+          
+          // Check if this is directly below the 2x1
+          if (Math.abs(posRow - widgetRow) === 1) {
+            const posCol = pos % 2;
+            const otherCol = posCol === 0 ? 1 : 0;
+            const otherPos = posRow * 2 + otherCol;
+            
+            // Only show if both bottom positions are available
+            if (!occupied.has(pos) && !occupied.has(otherPos)) {
+              validPositions.add(pos);
+              validPositions.add(otherPos);
+            }
+          }
+        }
+        // For 1x2: show positions that would create 2x2
+        else if (widget.size === "1x2") {
+          const widgetCol = widget.position % 2;
+          const posCol = pos % 2;
+          
+          // Check if this is to the right of the 1x2
+          if (Math.abs(posCol - widgetCol) === 1) {
+            // Get both positions in the 1x2 column
+            const widgetPositions = Array.from(currentPositions);
+            const rows = widgetPositions.map(p => Math.floor(p / 2));
+            
+            const rightPositions = rows.map(row => row * 2 + posCol);
+            
+            // Only show if both right positions are available
+            if (rightPositions.every(p => !occupied.has(p))) {
+              rightPositions.forEach(p => validPositions.add(p));
+            }
+          }
+        }
+        // For 2x2: can shrink, but we'll handle that in the click handler
       }
     }
-
-    // Also include current positions for shrinking
-    currentPositions.forEach((pos) => validPositions.add(pos));
 
     return Array.from(validPositions);
   };

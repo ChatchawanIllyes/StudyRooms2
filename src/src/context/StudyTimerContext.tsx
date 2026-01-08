@@ -9,7 +9,7 @@ import React, {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState, AppStateStatus } from "react-native";
 import * as StorageService from "../services/storage";
-import { StudySession } from "../types";
+import { StudySession, Subject } from "../types";
 
 interface StudyTimerState {
   isRunning: boolean;
@@ -18,14 +18,19 @@ interface StudyTimerState {
   accumulatedMs: number; // total elapsed from previous segments
   elapsedMs: number; // current total elapsed (computed)
   sessionStartedAt: number | null; // timestamp when the entire session started
+  currentSubject: Subject | null; // current study subject
+  showSubjectModal: boolean; // show subject selection modal
 }
 
 interface StudyTimerContextType extends StudyTimerState {
   start: () => void;
-  pause: () => void;
+  pause: () => Promise<void>;
   resume: () => void;
   reset: () => void;
   stopAndSave: () => Promise<void>;
+  startWithSubject: (subject: Subject) => void;
+  changeSubject: (subject: Subject) => Promise<void>;
+  setShowSubjectModal: (show: boolean) => void;
 }
 
 const StudyTimerContext = createContext<StudyTimerContextType | undefined>(
@@ -41,6 +46,8 @@ export function StudyTimerProvider({ children }: { children: ReactNode }) {
   const [accumulatedMs, setAccumulatedMs] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
+  const [currentSubject, setCurrentSubject] = useState<Subject | null>(null);
+  const [showSubjectModal, setShowSubjectModal] = useState(false);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const appState = useRef<AppStateStatus>(AppState.currentState);
@@ -53,7 +60,14 @@ export function StudyTimerProvider({ children }: { children: ReactNode }) {
   // Save state whenever it changes
   useEffect(() => {
     saveState();
-  }, [isRunning, isPaused, segmentStartedAt, accumulatedMs, sessionStartedAt]);
+  }, [
+    isRunning,
+    isPaused,
+    segmentStartedAt,
+    accumulatedMs,
+    sessionStartedAt,
+    currentSubject,
+  ]);
 
   // Update elapsed time every second when running
   useEffect(() => {
@@ -122,6 +136,7 @@ export function StudyTimerProvider({ children }: { children: ReactNode }) {
         segmentStartedAt,
         accumulatedMs,
         sessionStartedAt,
+        currentSubject,
       };
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (error) {
@@ -134,6 +149,16 @@ export function StudyTimerProvider({ children }: { children: ReactNode }) {
       const saved = await AsyncStorage.getItem(STORAGE_KEY);
       if (saved) {
         const state = JSON.parse(saved);
+
+        // Restore subject if it exists
+        if (state.currentSubject) {
+          setCurrentSubject(state.currentSubject);
+        }
+
+        // Restore session start time
+        if (state.sessionStartedAt) {
+          setSessionStartedAt(state.sessionStartedAt);
+        }
 
         // If was running, recalculate elapsed based on saved timestamp
         if (state.isRunning && state.segmentStartedAt) {
@@ -167,20 +192,32 @@ export function StudyTimerProvider({ children }: { children: ReactNode }) {
 
   const start = () => {
     if (!isRunning && !isPaused) {
+      // Show subject modal first
+      setShowSubjectModal(true);
+    }
+  };
+
+  const startWithSubject = (subject: Subject) => {
+    if (!isRunning && !isPaused) {
       const now = Date.now();
+      setCurrentSubject(subject);
       setSegmentStartedAt(now);
       setSessionStartedAt(now);
       setIsRunning(true);
       setIsPaused(false);
       setAccumulatedMs(0);
+      setShowSubjectModal(false);
     }
   };
 
-  const pause = () => {
+  const pause = async () => {
     if (isRunning && segmentStartedAt !== null) {
       const now = Date.now();
       const segmentElapsed = now - segmentStartedAt;
       const newAccumulated = accumulatedMs + segmentElapsed;
+
+      // Save partial session
+      await savePartialSession(newAccumulated);
 
       setAccumulatedMs(newAccumulated);
       setSegmentStartedAt(null);
@@ -204,6 +241,57 @@ export function StudyTimerProvider({ children }: { children: ReactNode }) {
     setAccumulatedMs(0);
     setElapsedMs(0);
     setSessionStartedAt(null);
+    setCurrentSubject(null);
+  };
+
+  const changeSubject = async (newSubject: Subject) => {
+    // Save current session with old subject
+    if (currentSubject && (isRunning || isPaused)) {
+      let finalElapsed = accumulatedMs;
+      if (isRunning && segmentStartedAt !== null) {
+        const now = Date.now();
+        const segmentElapsed = now - segmentStartedAt;
+        finalElapsed = accumulatedMs + segmentElapsed;
+      }
+
+      if (finalElapsed > 0) {
+        await savePartialSession(finalElapsed);
+      }
+    }
+
+    // Start new session with new subject
+    const now = Date.now();
+    setCurrentSubject(newSubject);
+    setSessionStartedAt(now);
+    setAccumulatedMs(0);
+
+    if (isRunning) {
+      setSegmentStartedAt(now);
+    } else if (isPaused) {
+      setSegmentStartedAt(null);
+    }
+  };
+
+  const savePartialSession = async (durationMs: number) => {
+    if (!currentSubject || durationMs === 0) return;
+
+    const endTime = Date.now();
+    const startTime = sessionStartedAt || endTime - durationMs;
+
+    const session: StudySession = {
+      id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      subject: currentSubject.name,
+      subjectId: currentSubject.id,
+      duration: Math.floor(durationMs / 1000), // in seconds
+      date: new Date(startTime).toISOString(),
+      pauseCount: isPaused ? 1 : 0,
+    };
+
+    try {
+      await StorageService.addSession(session);
+    } catch (error) {
+      console.error("Failed to save study session:", error);
+    }
   };
 
   const stopAndSave = async () => {
@@ -221,26 +309,8 @@ export function StudyTimerProvider({ children }: { children: ReactNode }) {
       finalElapsed = accumulatedMs + segmentElapsed;
     }
 
-    // Create session record
-    const endTime = Date.now();
-    const startTime = sessionStartedAt || endTime - finalElapsed;
-
-    const session: StudySession = {
-      id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      startTime,
-      endTime,
-      duration: Math.floor(finalElapsed / 1000), // in seconds
-      subject: "General Study", // Default subject
-      date: new Date(startTime).toISOString().split("T")[0],
-      createdAt: Date.now(),
-    };
-
-    try {
-      // Save to study sessions
-      await StorageService.saveStudySession(session);
-    } catch (error) {
-      console.error("Failed to save study session:", error);
-    }
+    // Save final session
+    await savePartialSession(finalElapsed);
 
     // Reset everything
     reset();
@@ -255,11 +325,16 @@ export function StudyTimerProvider({ children }: { children: ReactNode }) {
         accumulatedMs,
         elapsedMs,
         sessionStartedAt,
+        currentSubject,
+        showSubjectModal,
         start,
         pause,
         resume,
         reset,
         stopAndSave,
+        startWithSubject,
+        changeSubject,
+        setShowSubjectModal,
       }}
     >
       {children}

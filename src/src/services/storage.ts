@@ -82,12 +82,26 @@ export const saveSessions = async (sessions: StudySession[]): Promise<void> => {
 };
 
 export const addSession = async (session: StudySession): Promise<void> => {
-  const sessions = await getSessions();
+  let sessions = await getSessions();
   sessions.push(session);
+
+  // Clean up sessions older than 90 days
+  sessions = await cleanupOldSessions(sessions);
+
   await saveSessions(sessions);
 
   // Update daily stats
   await updateDailyStats(session);
+};
+
+// Clean up sessions older than 90 days
+const cleanupOldSessions = async (
+  sessions: StudySession[]
+): Promise<StudySession[]> => {
+  const ninetyDaysAgo = new Date();
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+  return sessions.filter((session) => new Date(session.date) >= ninetyDaysAgo);
 };
 
 export const getRecentSessions = async (
@@ -97,6 +111,43 @@ export const getRecentSessions = async (
   return sessions
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, limit);
+};
+
+// Get sessions for a specific date range
+export const getSessionsForPeriod = async (
+  startDate: Date,
+  endDate: Date
+): Promise<StudySession[]> => {
+  const sessions = await getSessions();
+  const start = startDate.toISOString();
+  const end = endDate.toISOString();
+
+  return sessions.filter((s) => s.date >= start && s.date <= end);
+};
+
+// Get sessions by subject
+export const getSessionsBySubject = async (
+  subjectId: string,
+  limit?: number
+): Promise<StudySession[]> => {
+  const sessions = await getSessions();
+  const filtered = sessions
+    .filter((s) => s.subjectId === subjectId)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  return limit ? filtered.slice(0, limit) : filtered;
+};
+
+// Get total study time by subject for a date range
+export const getSubjectTimeForPeriod = async (
+  subjectId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<number> => {
+  const sessions = await getSessionsForPeriod(startDate, endDate);
+  return sessions
+    .filter((s) => s.subjectId === subjectId)
+    .reduce((total, s) => total + s.duration, 0);
 };
 
 // ============ DAILY STATS ============
@@ -163,6 +214,48 @@ export const getStatsForPeriod = async (
   return stats.filter((s) => s.date >= start && s.date <= end);
 };
 
+// Get total study time for today in seconds
+export const getTodayTotalTime = async (): Promise<number> => {
+  const todayStats = await getTodayStats();
+  return todayStats ? todayStats.totalMinutes * 60 : 0;
+};
+
+// Get weekly summary (last 7 days)
+export const getWeeklySummary = async (): Promise<{
+  totalMinutes: number;
+  totalSessions: number;
+  dailyBreakdown: DailyStats[];
+  topSubjects: { subjectId: string; minutes: number }[];
+}> => {
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - 6); // Last 7 days including today
+
+  const dailyStats = await getStatsForPeriod(startDate, endDate);
+
+  const totalMinutes = dailyStats.reduce((sum, s) => sum + s.totalMinutes, 0);
+  const totalSessions = dailyStats.reduce((sum, s) => sum + s.sessions, 0);
+
+  // Aggregate subjects across the week
+  const subjectTotals: { [key: string]: number } = {};
+  dailyStats.forEach((day) => {
+    Object.entries(day.subjectBreakdown).forEach(([subjectId, minutes]) => {
+      subjectTotals[subjectId] = (subjectTotals[subjectId] || 0) + minutes;
+    });
+  });
+
+  const topSubjects = Object.entries(subjectTotals)
+    .map(([subjectId, minutes]) => ({ subjectId, minutes }))
+    .sort((a, b) => b.minutes - a.minutes);
+
+  return {
+    totalMinutes,
+    totalSessions,
+    dailyBreakdown: dailyStats,
+    topSubjects,
+  };
+};
+
 // ============ USER SETTINGS ============
 export const getUserSettings = async (): Promise<UserSettings> => {
   try {
@@ -221,7 +314,46 @@ export const saveSubjects = async (subjects: Subject[]): Promise<void> => {
   }
 };
 
+// Add a new subject
+export const addSubject = async (subject: Subject): Promise<void> => {
+  const subjects = await getSubjects();
+
+  // Check if subject with same ID already exists
+  const exists = subjects.some((s) => s.id === subject.id);
+  if (!exists) {
+    subjects.push(subject);
+    await saveSubjects(subjects);
+  }
+};
+
+// Update an existing subject
+export const updateSubject = async (
+  subjectId: string,
+  updates: Partial<Subject>
+): Promise<void> => {
+  const subjects = await getSubjects();
+  const index = subjects.findIndex((s) => s.id === subjectId);
+
+  if (index !== -1) {
+    subjects[index] = { ...subjects[index], ...updates };
+    await saveSubjects(subjects);
+  }
+};
+
+// Delete a subject (optional - you might want to keep subjects for historical data)
+export const deleteSubject = async (subjectId: string): Promise<void> => {
+  const subjects = await getSubjects();
+  const filtered = subjects.filter((s) => s.id !== subjectId);
+  await saveSubjects(filtered);
+};
+
 const getDefaultSubjects = (): Subject[] => [
+  {
+    id: "general",
+    name: "General Study",
+    icon: "book-outline",
+    color: "#8e8e93",
+  },
   { id: "math", name: "Math", icon: "calculator", color: "#5b9bd5" },
   { id: "science", name: "Science", icon: "flask", color: "#34c759" },
   { id: "english", name: "English", icon: "book", color: "#ff9500" },

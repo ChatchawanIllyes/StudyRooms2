@@ -23,8 +23,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../context/ThemeContext";
 import { WidgetSize } from "../context/WidgetContext";
-import { Task } from "../types";
+import { Task, Subject } from "../types";
 import * as StorageService from "../services/storage";
+import CalendarPicker from "./CalendarPicker";
 
 interface TaskWidgetProps {
   size: WidgetSize;
@@ -41,11 +42,16 @@ export default function TaskWidget({
 }: TaskWidgetProps) {
   const { colors, accentColor } = useTheme();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [newTaskText, setNewTaskText] = useState("");
   const [selectedPriority, setSelectedPriority] = useState<
     "low" | "medium" | "high"
   >("medium");
+  const [selectedCategory, setSelectedCategory] = useState<string | undefined>(
+    undefined
+  );
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedDueDate, setSelectedDueDate] = useState<Date | undefined>(
@@ -93,8 +99,9 @@ export default function TaskWidget({
     useCallback(() => {
       if (!isPreview) {
         loadTasks();
+        loadSubjects();
       }
-    }, [isPreview, loadTasks])
+    }, [isPreview])
   );
 
   const loadTasks = useCallback(async () => {
@@ -107,6 +114,11 @@ export default function TaskWidget({
         return priorityOrder[b.priority] - priorityOrder[a.priority];
       });
     setTasks(incompleteTasks);
+  }, []);
+
+  const loadSubjects = useCallback(async () => {
+    const allSubjects = await StorageService.getSubjects();
+    setSubjects(allSubjects);
   }, []);
 
   const handleToggleTask = async (taskId: string) => {
@@ -131,15 +143,22 @@ export default function TaskWidget({
       completed: false,
       createdAt: new Date().toISOString(),
       priority: selectedPriority,
+      category: selectedCategory,
       dueDate: selectedDueDate?.toISOString(),
     };
 
     await StorageService.addTask(newTask);
     setNewTaskText("");
     setSelectedPriority("medium");
+    setSelectedCategory(undefined);
     setSelectedDueDate(undefined);
     setShowAddModal(false);
     await loadTasks();
+  };
+
+  const getSubject = (categoryId?: string): Subject | null => {
+    if (!categoryId) return null;
+    return subjects.find((s) => s.id === categoryId) || null;
   };
 
   const handleTilePress = () => {
@@ -217,7 +236,7 @@ export default function TaskWidget({
             width: dimensions.width,
             height: dimensions.height,
             backgroundColor: "transparent",
-            overflow: "hidden",
+            overflow: isPreview ? "visible" : "hidden",
           },
         ]}
       >
@@ -314,9 +333,11 @@ export default function TaskWidget({
                   onToggle={handleToggleTask}
                   colors={colors}
                   accentColor={accentColor}
-                  isCompact={is1x1}
+                  widgetSize={size}
+                  is1x1={is1x1}
                   getPriorityColor={getPriorityColor}
                   formatDueDate={formatDueDate}
+                  getSubject={getSubject}
                 />
               ))}
               {remainingCount > 0 && (
@@ -456,9 +477,9 @@ export default function TaskWidget({
                               : colors.border,
                           },
                         ]}
-                        onPress={(e) => {
-                          e?.stopPropagation?.();
-                          setShowCalendar(true);
+                        onPress={() => {
+                          setShowAddModal(false);
+                          setTimeout(() => setShowCalendar(true), 300);
                         }}
                       >
                         <Ionicons
@@ -505,6 +526,71 @@ export default function TaskWidget({
                     </View>
                   </View>
 
+                  {/* Subject/Category Selector */}
+                  <View style={styles.dueDateSection}>
+                    <Text
+                      style={[
+                        styles.sectionLabel,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      Subject (Optional)
+                    </Text>
+                    <View style={styles.dueDateButtons}>
+                      <TouchableOpacity
+                        style={[
+                          styles.dueDateButton,
+                          {
+                            backgroundColor: selectedCategory
+                              ? accentColor
+                              : colors.border,
+                          },
+                        ]}
+                        onPress={() => {
+                          setShowAddModal(false);
+                          setTimeout(() => setShowCategoryPicker(true), 300);
+                        }}
+                      >
+                        <Ionicons
+                          name="folder-outline"
+                          size={16}
+                          color={selectedCategory ? "#FFFFFF" : colors.text}
+                          style={{ marginRight: 6 }}
+                        />
+                        <Text
+                          style={[
+                            styles.dueDateButtonText,
+                            {
+                              color: selectedCategory ? "#FFFFFF" : colors.text,
+                            },
+                          ]}
+                        >
+                          {selectedCategory
+                            ? getSubject(selectedCategory)?.name || "Subject"
+                            : "Pick Subject"}
+                        </Text>
+                      </TouchableOpacity>
+                      {selectedCategory && (
+                        <TouchableOpacity
+                          style={[
+                            styles.dueDateButton,
+                            {
+                              backgroundColor: colors.border,
+                              paddingHorizontal: 12,
+                            },
+                          ]}
+                          onPress={() => setSelectedCategory(undefined)}
+                        >
+                          <Ionicons
+                            name="close"
+                            size={16}
+                            color={colors.text}
+                          />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+
                   {/* Add Button */}
                   <TouchableOpacity
                     style={[
@@ -534,208 +620,120 @@ export default function TaskWidget({
           visible={showCalendar}
           transparent
           animationType="fade"
-          onRequestClose={() => setShowCalendar(false)}
-          statusBarTranslucent
-          presentationStyle="overFullScreen"
+          onRequestClose={() => {
+            setShowCalendar(false);
+            setTimeout(() => setShowAddModal(true), 300);
+          }}
         >
           <CalendarPicker
             selectedDate={selectedDueDate}
             onSelectDate={(date) => {
               setSelectedDueDate(date);
               setShowCalendar(false);
+              setTimeout(() => setShowAddModal(true), 300);
             }}
-            onClose={() => setShowCalendar(false)}
+            onClose={() => {
+              setShowCalendar(false);
+              setTimeout(() => setShowAddModal(true), 300);
+            }}
             colors={colors}
             accentColor={accentColor}
           />
         </Modal>
       )}
-    </>
-  );
-}
 
-interface CalendarPickerProps {
-  selectedDate?: Date;
-  onSelectDate: (date: Date) => void;
-  onClose: () => void;
-  colors: any;
-  accentColor: string;
-}
-
-function CalendarPicker({
-  selectedDate,
-  onSelectDate,
-  onClose,
-  colors,
-  accentColor,
-}: CalendarPickerProps) {
-  const [currentMonth, setCurrentMonth] = useState(
-    selectedDate ? new Date(selectedDate) : new Date()
-  );
-
-  const getDaysInMonth = (date: Date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
-
-    return { daysInMonth, startingDayOfWeek };
-  };
-
-  const { daysInMonth, startingDayOfWeek } = getDaysInMonth(currentMonth);
-
-  const previousMonth = () => {
-    setCurrentMonth(
-      new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1)
-    );
-  };
-
-  const nextMonth = () => {
-    setCurrentMonth(
-      new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1)
-    );
-  };
-
-  const selectDate = (day: number) => {
-    const selected = new Date(
-      currentMonth.getFullYear(),
-      currentMonth.getMonth(),
-      day
-    );
-    onSelectDate(selected);
-  };
-
-  const isSelectedDate = (day: number) => {
-    if (!selectedDate) return false;
-    const checkDate = new Date(
-      currentMonth.getFullYear(),
-      currentMonth.getMonth(),
-      day
-    );
-    return checkDate.toDateString() === selectedDate.toDateString();
-  };
-
-  const isToday = (day: number) => {
-    const today = new Date();
-    const checkDate = new Date(
-      currentMonth.getFullYear(),
-      currentMonth.getMonth(),
-      day
-    );
-    return checkDate.toDateString() === today.toDateString();
-  };
-
-  // Create array of day numbers
-  const days = [];
-  for (let i = 0; i < startingDayOfWeek; i++) {
-    days.push(null);
-  }
-  for (let i = 1; i <= daysInMonth; i++) {
-    days.push(i);
-  }
-
-  const weekDays = ["S", "M", "T", "W", "T", "F", "S"];
-
-  return (
-    <>
-      <TouchableOpacity
-        style={styles.calendarOverlay}
-        activeOpacity={1}
-        onPress={onClose}
-      >
-        <View />
-      </TouchableOpacity>
-      <View style={styles.calendarContainerWrapper}>
-        <View
-          style={[styles.calendarContainer, { backgroundColor: colors.card }]}
+      {/* Category/Subject Picker Modal */}
+      {showCategoryPicker && (
+        <Modal
+          visible={showCategoryPicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            setShowCategoryPicker(false);
+            setTimeout(() => setShowAddModal(true), 300);
+          }}
         >
-          {/* Calendar Header */}
-          <View style={styles.calendarHeader}>
-            <TouchableOpacity
-              onPress={previousMonth}
-              style={styles.calendarNav}
-            >
-              <Ionicons name="chevron-back" size={24} color={colors.text} />
-            </TouchableOpacity>
-            <Text style={[styles.calendarTitle, { color: colors.text }]}>
-              {currentMonth.toLocaleDateString("en-US", {
-                month: "long",
-                year: "numeric",
-              })}
-            </Text>
-            <TouchableOpacity onPress={nextMonth} style={styles.calendarNav}>
-              <Ionicons name="chevron-forward" size={24} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Week Day Labels */}
-          <View style={styles.weekDaysRow}>
-            {weekDays.map((day, index) => (
-              <View key={index} style={styles.weekDayCell}>
-                <Text
-                  style={[styles.weekDayText, { color: colors.textSecondary }]}
-                >
-                  {day}
-                </Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Calendar Grid */}
-          <View style={styles.calendarGrid}>
-            {days.map((day, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.dayCell}
-                onPress={() => day && selectDate(day)}
-                disabled={!day}
-              >
-                {day && (
-                  <View
-                    style={[
-                      styles.dayButton,
-                      isSelectedDate(day) && {
-                        backgroundColor: accentColor,
-                      },
-                      isToday(day) &&
-                        !isSelectedDate(day) && {
-                          borderWidth: 2,
-                          borderColor: accentColor,
-                        },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.dayText,
-                        {
-                          color: isSelectedDate(day) ? "#FFFFFF" : colors.text,
-                        },
-                      ]}
-                    >
-                      {day}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Close Button */}
           <TouchableOpacity
-            style={[
-              styles.calendarCloseButton,
-              { backgroundColor: colors.border },
-            ]}
-            onPress={onClose}
+            style={styles.calendarOverlay}
+            activeOpacity={1}
+            onPress={() => {
+              setShowCategoryPicker(false);
+              setTimeout(() => setShowAddModal(true), 300);
+            }}
           >
-            <Text style={[styles.calendarCloseText, { color: colors.text }]}>
-              Close
-            </Text>
+            <TouchableOpacity
+              style={styles.calendarContainerWrapper}
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View
+                style={[
+                  styles.calendarContainer,
+                  { backgroundColor: colors.card },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.calendarTitle,
+                    { color: colors.text, marginBottom: 20 },
+                  ]}
+                >
+                  Select Subject
+                </Text>
+                <ScrollView style={{ maxHeight: 400 }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.subjectOption,
+                      { backgroundColor: colors.background },
+                    ]}
+                    onPress={() => {
+                      setSelectedCategory(undefined);
+                      setShowCategoryPicker(false);
+                      setTimeout(() => setShowAddModal(true), 300);
+                    }}
+                  >
+                    <Text style={[styles.subjectText, { color: colors.text }]}>
+                      No Subject
+                    </Text>
+                  </TouchableOpacity>
+                  {subjects.map((subject) => (
+                    <TouchableOpacity
+                      key={subject.id}
+                      style={[
+                        styles.subjectOption,
+                        { backgroundColor: colors.background },
+                      ]}
+                      onPress={() => {
+                        setSelectedCategory(subject.id);
+                        setShowCategoryPicker(false);
+                        setTimeout(() => setShowAddModal(true), 300);
+                      }}
+                    >
+                      <View
+                        style={[
+                          styles.subjectIconContainer,
+                          { backgroundColor: subject.color },
+                        ]}
+                      >
+                        <Ionicons
+                          name={subject.icon}
+                          size={20}
+                          color="#FFFFFF"
+                        />
+                      </View>
+                      <Text
+                        style={[styles.subjectText, { color: colors.text }]}
+                      >
+                        {subject.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </TouchableOpacity>
           </TouchableOpacity>
-        </View>
-      </View>
+        </Modal>
+      )}
     </>
   );
 }
@@ -745,9 +743,11 @@ interface TaskItemProps {
   onToggle: (id: string) => void;
   colors: any;
   accentColor: string;
-  isCompact: boolean;
+  widgetSize: WidgetSize;
+  is1x1: boolean;
   getPriorityColor: (priority: "low" | "medium" | "high") => string;
   formatDueDate: (dateString?: string) => string | null;
+  getSubject: (categoryId?: string) => Subject | null;
 }
 
 function TaskItem({
@@ -755,9 +755,11 @@ function TaskItem({
   onToggle,
   colors,
   accentColor,
-  isCompact,
+  widgetSize,
+  is1x1,
   getPriorityColor,
   formatDueDate,
+  getSubject,
 }: TaskItemProps) {
   const scale = useSharedValue(1);
 
@@ -775,7 +777,129 @@ function TaskItem({
 
   const dueDate = formatDueDate(task.dueDate);
   const priorityColor = getPriorityColor(task.priority);
+  const subject = getSubject(task.category);
 
+  // 1x1: Super compact - emoji subject only
+  if (is1x1) {
+    return (
+      <Animated.View style={[styles.taskItem, animatedStyle]}>
+        <TouchableOpacity
+          style={styles.checkbox}
+          onPress={handlePress}
+          activeOpacity={0.7}
+        >
+          <View
+            style={[
+              styles.checkboxInner,
+              { borderColor: colors.border, backgroundColor: "transparent" },
+            ]}
+          />
+        </TouchableOpacity>
+
+        <View style={[styles.taskContent, { gap: 2 }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            {subject && (
+              <View
+                style={[styles.subjectDot, { backgroundColor: subject.color }]}
+              />
+            )}
+            <Text
+              style={[
+                styles.taskText,
+                {
+                  color: colors.text,
+                  fontSize: 13,
+                  flex: 1,
+                },
+              ]}
+              numberOfLines={1}
+            >
+              {task.text}
+            </Text>
+          </View>
+        </View>
+      </Animated.View>
+    );
+  }
+
+  // 2x1: Horizontal layout - subject badge inline
+  if (widgetSize === "2x1") {
+    return (
+      <Animated.View style={[styles.taskItem, animatedStyle]}>
+        <TouchableOpacity
+          style={styles.checkbox}
+          onPress={handlePress}
+          activeOpacity={0.7}
+        >
+          <View
+            style={[
+              styles.checkboxInner,
+              { borderColor: colors.border, backgroundColor: "transparent" },
+            ]}
+          />
+        </TouchableOpacity>
+
+        <View style={styles.taskContent}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text
+              style={[
+                styles.taskText,
+                {
+                  color: colors.text,
+                  fontSize: 14,
+                  flex: 1,
+                },
+              ]}
+              numberOfLines={1}
+            >
+              {task.text}
+            </Text>
+            {subject && (
+              <View
+                style={[
+                  styles.subjectBadge,
+                  { backgroundColor: `${subject.color}20` },
+                ]}
+              >
+                <Ionicons name={subject.icon} size={12} color={subject.color} />
+              </View>
+            )}
+          </View>
+          {(dueDate || task.priority) && (
+            <View style={styles.taskMeta}>
+              {task.priority && (
+                <View
+                  style={[
+                    styles.priorityBadge,
+                    { backgroundColor: `${priorityColor}20` },
+                  ]}
+                >
+                  <Text
+                    style={[styles.priorityBadgeText, { color: priorityColor }]}
+                  >
+                    {task.priority}
+                  </Text>
+                </View>
+              )}
+              {dueDate && (
+                <Text
+                  style={[styles.dueDateText, { color: colors.textSecondary }]}
+                >
+                  {dueDate}
+                </Text>
+              )}
+            </View>
+          )}
+        </View>
+
+        <View
+          style={[styles.priorityIndicator, { backgroundColor: priorityColor }]}
+        />
+      </Animated.View>
+    );
+  }
+
+  // 1x2 & 2x2: Full layout - subject below title
   return (
     <Animated.View style={[styles.taskItem, animatedStyle]}>
       <TouchableOpacity
@@ -797,45 +921,57 @@ function TaskItem({
             styles.taskText,
             {
               color: colors.text,
-              fontSize: isCompact ? 13 : 14,
+              fontSize: 14,
             },
           ]}
-          numberOfLines={isCompact ? 1 : 2}
+          numberOfLines={2}
         >
           {task.text}
         </Text>
-        {!isCompact && (dueDate || task.priority) && (
-          <View style={styles.taskMeta}>
-            {task.priority && (
-              <View
+        <View style={[styles.taskMeta, { flexWrap: "wrap" }]}>
+          {subject && (
+            <View
+              style={[
+                styles.subjectBadge,
+                { backgroundColor: `${subject.color}20`, paddingHorizontal: 8 },
+              ]}
+            >
+              <Ionicons name={subject.icon} size={12} color={subject.color} />
+              <Text
                 style={[
-                  styles.priorityBadge,
-                  { backgroundColor: `${priorityColor}20` },
+                  styles.subjectBadgeText,
+                  { color: subject.color, marginLeft: 4 },
                 ]}
               >
-                <Text
-                  style={[styles.priorityBadgeText, { color: priorityColor }]}
-                >
-                  {task.priority}
-                </Text>
-              </View>
-            )}
-            {dueDate && (
-              <Text
-                style={[styles.dueDateText, { color: colors.textSecondary }]}
-              >
-                {dueDate}
+                {subject.name}
               </Text>
-            )}
-          </View>
-        )}
+            </View>
+          )}
+          {task.priority && (
+            <View
+              style={[
+                styles.priorityBadge,
+                { backgroundColor: `${priorityColor}20` },
+              ]}
+            >
+              <Text
+                style={[styles.priorityBadgeText, { color: priorityColor }]}
+              >
+                {task.priority}
+              </Text>
+            </View>
+          )}
+          {dueDate && (
+            <Text style={[styles.dueDateText, { color: colors.textSecondary }]}>
+              {dueDate}
+            </Text>
+          )}
+        </View>
       </View>
 
-      {!isCompact && (
-        <View
-          style={[styles.priorityIndicator, { backgroundColor: priorityColor }]}
-        />
-      )}
+      <View
+        style={[styles.priorityIndicator, { backgroundColor: priorityColor }]}
+      />
     </Animated.View>
   );
 }
@@ -959,6 +1095,41 @@ const styles = StyleSheet.create({
     borderRadius: 1.5,
     marginTop: 2,
   },
+  subjectDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  subjectBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  subjectBadgeText: {
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  subjectOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    gap: 12,
+  },
+  subjectIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  subjectText: {
+    fontSize: 16,
+    fontWeight: "500",
+  },
   remainingText: {
     fontSize: 12,
     fontWeight: "500",
@@ -1062,11 +1233,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.6)",
   },
   calendarContainerWrapper: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
-    pointerEvents: "box-none",
   },
   calendarContainer: {
     width: "100%",

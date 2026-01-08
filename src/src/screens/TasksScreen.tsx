@@ -14,6 +14,7 @@ import { useTheme } from "../context/ThemeContext";
 import { useFocusEffect } from "@react-navigation/native";
 import { Task } from "../types";
 import * as StorageService from "../services/storage";
+import CalendarPicker from "../components/CalendarPicker";
 
 interface TasksScreenProps {
   navigation?: any;
@@ -460,74 +461,25 @@ export default function TasksScreen({ navigation }: TasksScreenProps) {
       </Modal>
 
       {/* Date Picker Modal */}
-      <Modal
-        visible={showDatePicker}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowDatePicker(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                Select Due Date
-              </Text>
-              <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                <Ionicons name="close" size={24} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalScroll}>
-              <TouchableOpacity
-                style={[
-                  styles.dateOption,
-                  { backgroundColor: colors.background },
-                ]}
-                onPress={() => {
-                  setSelectedDueDate(undefined);
-                  setShowDatePicker(false);
-                }}
-              >
-                <Text style={[styles.dateText, { color: colors.text }]}>
-                  No Due Date
-                </Text>
-              </TouchableOpacity>
-
-              {[0, 1, 2, 3, 7, 14].map((daysFromNow) => {
-                const date = new Date();
-                date.setDate(date.getDate() + daysFromNow);
-                const label =
-                  daysFromNow === 0
-                    ? "Today"
-                    : daysFromNow === 1
-                    ? "Tomorrow"
-                    : date.toLocaleDateString("en-US", {
-                        month: "long",
-                        day: "numeric",
-                      });
-
-                return (
-                  <TouchableOpacity
-                    key={daysFromNow}
-                    style={[
-                      styles.dateOption,
-                      { backgroundColor: colors.background },
-                    ]}
-                    onPress={() => {
-                      setSelectedDueDate(date);
-                      setShowDatePicker(false);
-                    }}
-                  >
-                    <Text style={[styles.dateText, { color: colors.text }]}>
-                      {label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      {showDatePicker && (
+        <Modal
+          visible={showDatePicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <CalendarPicker
+            selectedDate={selectedDueDate}
+            onSelectDate={(date) => {
+              setSelectedDueDate(date);
+              setShowDatePicker(false);
+            }}
+            onClose={() => setShowDatePicker(false)}
+            colors={colors}
+            accentColor={colors.accent}
+          />
+        </Modal>
+      )}
     </View>
   );
 }

@@ -94,7 +94,7 @@ export default function MyWidgetsScreen() {
           <Text
             style={[styles.sectionDescription, { color: colors.textSecondary }]}
           >
-            Add widgets to customize your home screen
+            Add widgets to customize your home
           </Text>
 
           {/* Installed Badge */}

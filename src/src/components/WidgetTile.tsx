@@ -10,6 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import { WidgetType, WidgetSize, useWidgets } from "../context/WidgetContext";
 import TimerWidget from "./TimerWidget";
+import TaskWidget from "./TaskWidget";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -186,6 +187,61 @@ export default function WidgetTile({
             size={size}
             isEditMode={isEditMode || isInResizeMode}
             onNavigateToTimer={() => onPress?.()}
+            isPreview={isPreview}
+          />
+        </View>
+      </Animated.View>
+    );
+  }
+
+  // If tasks widget, render TaskWidget component instead
+  if (type === "tasks") {
+    return (
+      <Animated.View style={[animatedStyle]}>
+        <View
+          style={[
+            {
+              width: dimensions.width,
+              height: dimensions.height,
+              backgroundColor: colors.card,
+              borderColor:
+                isEditMode || isInResizeMode ? accentColor : "transparent",
+              borderWidth: 2,
+              borderRadius: 16,
+              overflow: "visible",
+            },
+          ]}
+        >
+          {/* Edit Mode Controls */}
+          {isEditMode && !isInResizeMode && (
+            <>
+              <TouchableOpacity
+                style={[styles.removeButton, { backgroundColor: "#ff3b30" }]}
+                onPress={onRemove}
+              >
+                <Ionicons name="close" size={16} color="#ffffff" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.resizeButton,
+                  {
+                    backgroundColor: "rgba(0, 0, 0, 0.75)",
+                    borderWidth: 2,
+                    borderColor: "rgba(255, 255, 255, 0.3)",
+                  },
+                ]}
+                onPress={handleResizePress}
+              >
+                <Ionicons name="expand-outline" size={14} color="#ffffff" />
+              </TouchableOpacity>
+            </>
+          )}
+
+          <TaskWidget
+            size={size}
+            isEditMode={isEditMode || isInResizeMode}
+            onNavigateToTasks={() => onPress?.()}
             isPreview={isPreview}
           />
         </View>

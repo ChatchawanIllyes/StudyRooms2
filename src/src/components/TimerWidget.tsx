@@ -207,7 +207,14 @@ export default function TimerWidget({
       {/* Bottom Section: Beads Grid (40%) */}
       <View style={[styles.bottomSection, { flex: is2x2 ? 4 : 3 }]}>
         {/* Beads Grid: 2 rows × 6 columns */}
-        <View style={styles.beadsContainer}>
+        <View
+          style={[
+            styles.beadsContainer,
+            {
+              marginBottom: is2x2 ? 16 : size === "1x2" ? 12 : 8,
+            },
+          ]}
+        >
           {/* Row 1 (beads 0-5) */}
           <View style={styles.beadsRow}>
             {[0, 1, 2, 3, 4, 5].map((i) => (
@@ -234,18 +241,6 @@ export default function TimerWidget({
             ))}
           </View>
         </View>
-
-        {/* Hour Indicator below beads */}
-        {displayElapsedMs > 0 && (
-          <Text
-            style={[
-              styles.hourIndicator,
-              { color: colors.textSecondary, opacity: 0.5 },
-            ]}
-          >
-            {is2x2 ? `HOUR ${cycleIndex}` : `×${cycleIndex}`}
-          </Text>
-        )}
 
         {/* Status text above controls for 1x1 and 2x1 */}
         {(is1x1 || size === "2x1") && (

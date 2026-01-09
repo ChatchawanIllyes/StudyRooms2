@@ -53,11 +53,68 @@ export default function StatsHeatmapWidget({
 
   const loadData = async () => {
     try {
-      const loadedSessions = await StorageService.getSessions();
-      setSessions(loadedSessions);
+      // Generate dummy data for visualization
+      const dummySessions = generateDummyStudySessions();
+      setSessions(dummySessions);
+
+      // Uncomment below to use real data:
+      // const loadedSessions = await StorageService.getSessions();
+      // setSessions(loadedSessions);
     } catch (error) {
       console.error("Error loading stats data:", error);
     }
+  };
+
+  // Generate dummy study sessions for the entire calendar year
+  const generateDummyStudySessions = (): StudySession[] => {
+    const sessions: StudySession[] = [];
+    const currentYear = new Date().getFullYear();
+
+    // Create sessions for each day of the year with varying study times
+    for (let month = 0; month < 12; month++) {
+      const daysInMonth = new Date(currentYear, month + 1, 0).getDate();
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        // Random chance to have study sessions (80% of days)
+        if (Math.random() > 0.2) {
+          const numSessions = Math.floor(Math.random() * 3) + 1; // 1-3 sessions per day
+
+          for (let session = 0; session < numSessions; session++) {
+            const date = new Date(currentYear, month, day);
+            const startTime = date.getTime() + session * 3600000; // Spread sessions across day
+
+            // Vary study durations: 5-90 minutes per session
+            // Create different patterns: some light days, some heavy days
+            let duration: number;
+            const dayPattern = Math.random();
+
+            if (dayPattern < 0.2) {
+              // Light study day (1-14 minutes total)
+              duration = Math.floor(Math.random() * 10) + 2;
+            } else if (dayPattern < 0.5) {
+              // Moderate study day (15-29 minutes)
+              duration = Math.floor(Math.random() * 15) + 5;
+            } else if (dayPattern < 0.8) {
+              // Good study day (30-59 minutes)
+              duration = Math.floor(Math.random() * 25) + 10;
+            } else {
+              // Intense study day (60+ minutes)
+              duration = Math.floor(Math.random() * 40) + 20;
+            }
+
+            sessions.push({
+              id: `dummy-${month}-${day}-${session}`,
+              subject: "General Study",
+              subjectId: "general",
+              date: date.toISOString(),
+              duration: duration * 60, // Convert to seconds for storage
+            });
+          }
+        }
+      }
+    }
+
+    return sessions;
   };
 
   // Calculate daily totals with memoization

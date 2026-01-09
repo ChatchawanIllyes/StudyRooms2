@@ -130,6 +130,8 @@ export default function HomeScreen() {
     getValidAdjacentPositions,
     getSizeFromPositions,
     setResizeState,
+    dragState,
+    setDragState,
     placementMode,
     setPlacementMode,
     homeTitle,
@@ -237,6 +239,11 @@ export default function HomeScreen() {
               setResizeState(null);
             }
 
+            // Clear drag state if we're removing the widget being dragged
+            if (dragState?.widgetId === id) {
+              setDragState(null);
+            }
+
             // Reset timer if removing a timer widget
             if (widget?.type === "timer") {
               resetTimer();
@@ -247,6 +254,29 @@ export default function HomeScreen() {
         },
       ]
     );
+  };
+
+  const handleDragStart = (widgetId: string) => {
+    const widget = widgets.find((w) => w.id === widgetId);
+    if (widget) {
+      setDragState({
+        widgetId,
+        startPosition: widget.position,
+        currentPosition: widget.position,
+      });
+    }
+  };
+
+  const handleDragEnd = (widgetId: string, newPosition: number | null) => {
+    if (newPosition !== null && dragState) {
+      // Attempt to move the widget
+      const success = moveWidget(widgetId, newPosition);
+      if (!success) {
+        // Could show a toast/alert here if desired
+        console.log("Cannot move widget to that position");
+      }
+    }
+    setDragState(null);
   };
 
   const handleResizeWidget = (id: string, currentSize: WidgetSize) => {
@@ -316,7 +346,7 @@ export default function HomeScreen() {
     const posCol = position % 2;
 
     const currentTargets = resizeState.targetPositions || [];
-    let newTargets: number[];
+    let newTargets: number[] = [];
     let newSize: WidgetSize | null = null;
     let newPosition = widget.position;
 
@@ -586,7 +616,12 @@ export default function HomeScreen() {
             position: "absolute",
             left,
             top,
-            zIndex: resizeState?.widgetId === widget.id ? 10 : 2,
+            zIndex:
+              resizeState?.widgetId === widget.id
+                ? 10
+                : dragState?.widgetId === widget.id
+                ? 100
+                : 2,
           }}
         >
           <WidgetTile
@@ -598,6 +633,8 @@ export default function HomeScreen() {
             onPress={() => handleWidgetPress(widget.type)}
             onRemove={() => handleRemoveWidget(widget.id)}
             onResize={() => handleResizeWidget(widget.id, widget.size)}
+            onDragStart={() => handleDragStart(widget.id)}
+            onDragEnd={(newPos) => handleDragEnd(widget.id, newPos)}
           />
         </View>
       );

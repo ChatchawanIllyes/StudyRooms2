@@ -24,6 +24,12 @@ interface ResizeState {
   targetPositions?: number[];
 }
 
+interface DragState {
+  widgetId: string;
+  startPosition: number;
+  currentPosition: number;
+}
+
 interface WidgetContextType {
   widgets: WidgetConfig[];
   addWidget: (type: WidgetType, position: number, size: WidgetSize) => void;
@@ -50,6 +56,8 @@ interface WidgetContextType {
   setIsEditMode: (mode: boolean) => void;
   resizeState: ResizeState | null;
   setResizeState: (state: ResizeState | null) => void;
+  dragState: DragState | null;
+  setDragState: (state: DragState | null) => void;
   placementMode: {
     widgetType: WidgetType;
     previewPosition: number | null;
@@ -73,6 +81,7 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
   const [widgets, setWidgets] = useState<WidgetConfig[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
+  const [dragState, setDragState] = useState<DragState | null>(null);
   const [placementMode, setPlacementMode] = useState<{
     widgetType: WidgetType;
     previewPosition: number | null;
@@ -433,6 +442,8 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
         setIsEditMode,
         resizeState,
         setResizeState,
+        dragState,
+        setDragState,
         placementMode,
         setPlacementMode,
         homeTitle,

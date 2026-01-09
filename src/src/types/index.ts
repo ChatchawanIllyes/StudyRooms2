@@ -48,7 +48,8 @@ export interface DailyStats {
 }
 
 export interface UserSettings {
-  dailyGoal: number; // minutes
+  dailyGoal: number; // minutes (legacy, keep for compatibility)
+  dailyGoalMinutes: number; // minutes - primary daily study goal
   breakDuration: number; // minutes
   focusDuration: number; // minutes (default 25)
   soundEnabled: boolean;

@@ -39,6 +39,12 @@ const AVAILABLE_WIDGETS: Array<{
     icon: "bar-chart-outline",
     description: "See your daily study progress at a glance",
   },
+  {
+    type: "stats-heatmap",
+    name: "Study Heatmap",
+    icon: "grid-outline",
+    description: "GitHub-style heatmap of your study activity",
+  },
 ];
 
 export default function MyWidgetsScreen() {

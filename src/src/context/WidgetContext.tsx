@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export type WidgetType = "timer" | "tasks" | "stats";
+export type WidgetType = "timer" | "tasks" | "stats" | "stats-heatmap";
 export type WidgetSize = "1x1" | "2x1" | "1x2" | "2x2";
 
 export interface WidgetConfig {

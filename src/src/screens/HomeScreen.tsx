@@ -282,30 +282,87 @@ export default function HomeScreen() {
   const handleResizeWidget = (id: string, currentSize: WidgetSize) => {
     const sizeOptions = ["1×1", "2×1", "1×2", "Cancel"];
 
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        title: "Resize Widget",
-        options: sizeOptions,
-        cancelButtonIndex: 3,
-      },
-      (buttonIndex) => {
-        if (buttonIndex === 3) return;
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: "Resize Widget",
+          options: sizeOptions,
+          cancelButtonIndex: 3,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 3) return;
 
-        const sizeMap: WidgetSize[] = ["1x1", "2x1", "1x2"];
-        const newSize = sizeMap[buttonIndex];
+          const sizeMap: WidgetSize[] = ["1x1", "2x1", "1x2"];
+          const newSize = sizeMap[buttonIndex];
 
-        if (newSize === currentSize) return;
+          if (newSize === currentSize) return;
 
-        const success = resizeWidget(id, newSize);
-        if (!success) {
-          Alert.alert(
-            "Cannot Resize",
-            "Not enough space. Try removing other widgets first.",
-            [{ text: "OK" }]
-          );
+          const success = resizeWidget(id, newSize);
+          if (!success) {
+            Alert.alert(
+              "Cannot Resize",
+              "Not enough space. Try removing other widgets first.",
+              [{ text: "OK" }]
+            );
+          }
         }
-      }
-    );
+      );
+    } else {
+      // Android: Use Alert with buttons
+      Alert.alert(
+        "Resize Widget",
+        "Choose a size",
+        [
+          {
+            text: "1×1",
+            onPress: () => {
+              if ("1x1" !== currentSize) {
+                const success = resizeWidget(id, "1x1");
+                if (!success) {
+                  Alert.alert(
+                    "Cannot Resize",
+                    "Not enough space. Try removing other widgets first.",
+                    [{ text: "OK" }]
+                  );
+                }
+              }
+            },
+          },
+          {
+            text: "2×1",
+            onPress: () => {
+              if ("2x1" !== currentSize) {
+                const success = resizeWidget(id, "2x1");
+                if (!success) {
+                  Alert.alert(
+                    "Cannot Resize",
+                    "Not enough space. Try removing other widgets first.",
+                    [{ text: "OK" }]
+                  );
+                }
+              }
+            },
+          },
+          {
+            text: "1×2",
+            onPress: () => {
+              if ("1x2" !== currentSize) {
+                const success = resizeWidget(id, "1x2");
+                if (!success) {
+                  Alert.alert(
+                    "Cannot Resize",
+                    "Not enough space. Try removing other widgets first.",
+                    [{ text: "OK" }]
+                  );
+                }
+              }
+            },
+          },
+          { text: "Cancel", style: "cancel" },
+        ],
+        { cancelable: true }
+      );
+    }
   };
 
   const getPositionCoordinates = (

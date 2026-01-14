@@ -7,12 +7,15 @@ import {
   Platform,
   Dimensions,
   Alert,
+  ScrollView,
+  KeyboardAvoidingView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../context/ThemeContext";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useWidgets, WidgetType, WidgetSize } from "../context/WidgetContext";
 import { Ionicons } from "@expo/vector-icons";
+import WidgetTile from "../components/WidgetTile";
 
 const { width } = Dimensions.get("window");
 const PADDING = 20;
@@ -79,12 +82,20 @@ export default function PlaceWidgetScreen() {
     const isOccupied = occupiedPositions.has(position);
     const isSelected = selectedPosition === position;
     const isAvailable = isSlotAvailableForSize(position);
+    const showPreview = isSelected && canConfirm();
 
     return (
       <TouchableOpacity
         key={position}
         disabled={isOccupied}
-        onPress={() => setSelectedPosition(position)}
+        onPress={() => {
+          if (isSelected && canConfirm()) {
+            // Tapping selected slot with valid config confirms placement
+            handleConfirm();
+          } else {
+            setSelectedPosition(position);
+          }
+        }}
         style={[
           styles.previewSlot,
           {
@@ -92,14 +103,30 @@ export default function PlaceWidgetScreen() {
             height: PREVIEW_SLOT_SIZE,
             borderColor: isSelected ? accentColor : colors.border,
             backgroundColor: isOccupied ? colors.card : colors.background,
-            opacity: isOccupied ? 0.3 : isAvailable ? 1 : 0.5,
+            opacity: isOccupied ? 0.3 : 1,
           },
           isSelected && { borderWidth: 2.5 },
         ]}
       >
-        {isSelected && (
-          <Ionicons name="checkmark-circle" size={24} color={accentColor} />
-        )}
+        {/* Show actual widget preview when selected and valid */}
+        {showPreview ? (
+          <View style={styles.widgetPreviewContainer}>
+            <WidgetTile
+              type={widgetType}
+              size={selectedSize}
+              isPreview={true}
+            />
+            {/* Checkmark overlay on top-right of widget preview */}
+            <View
+              style={[
+                styles.slotCheckmark,
+                { backgroundColor: accentColor }
+              ]}
+            >
+              <Ionicons name="checkmark" size={20} color="#fff" />
+            </View>
+          </View>
+        ) : null}
       </TouchableOpacity>
     );
   };
@@ -124,32 +151,40 @@ export default function PlaceWidgetScreen() {
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background }]}
-      edges={["top"]}
+      edges={["top", "bottom"]}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Ionicons name="chevron-back" size={28} color={accentColor} />
-        </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.text }]}>Place Widget</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Ionicons name="chevron-back" size={28} color={accentColor} />
+          </TouchableOpacity>
+          <Text style={[styles.title, { color: colors.text }]}>Place Widget</Text>
+          <View style={styles.placeholder} />
+        </View>
 
-      <View style={styles.content}>
+        <ScrollView 
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+        >
         {/* Widget Info */}
         <View style={[styles.widgetInfoCard, { backgroundColor: colors.card }]}>
           <Ionicons name={widgetInfo.icon} size={32} color={accentColor} />
-          <Text style={[styles.widgetName, { color: colors.text }]}>
+          <Text style={[styles.widgetName, { color: colors.text }]}> 
             {widgetInfo.name}
           </Text>
         </View>
 
         {/* Step 1: Choose Position */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}> 
             1. Choose Position
           </Text>
           <Text
@@ -162,7 +197,7 @@ export default function PlaceWidgetScreen() {
 
         {/* Step 2: Choose Size */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}> 
             2. Choose Size
           </Text>
           <View style={styles.sizeOptions}>
@@ -204,43 +239,15 @@ export default function PlaceWidgetScreen() {
 
         {/* Warning */}
         {spaceWarning && (
-          <View style={[styles.warningBox, { backgroundColor: "#ff3b3015" }]}>
+          <View style={[styles.warningBox, { backgroundColor: "#ff3b3015" }]}> 
             <Ionicons name="warning-outline" size={20} color="#ff3b30" />
-            <Text style={[styles.warningText, { color: "#ff3b30" }]}>
+            <Text style={[styles.warningText, { color: "#ff3b30" }]}> 
               {spaceWarning}
             </Text>
           </View>
         )}
-      </View>
-
-      {/* Footer Buttons */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={[styles.secondaryButton, { borderColor: colors.border }]}
-        >
-          <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
-            Cancel
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={handleConfirm}
-          disabled={!canConfirm()}
-          style={[
-            styles.primaryButton,
-            { backgroundColor: canConfirm() ? accentColor : colors.border },
-          ]}
-        >
-          <Text
-            style={[
-              styles.primaryButtonText,
-              { color: canConfirm() ? "#ffffff" : colors.textSecondary },
-            ]}
-          >
-            Add to Home
-          </Text>
-        </TouchableOpacity>
-      </View>
+      </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -274,6 +281,9 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 20,
+  },
+  contentContainer: {
+    paddingBottom: 16,
   },
   widgetInfoCard: {
     flexDirection: "row",
@@ -314,6 +324,31 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
+    position: "relative",
+    overflow: "visible",
+  },
+  widgetPreviewContainer: {
+    width: "100%",
+    height: "100%",
+    position: "relative",
+  },
+  slotCheckmark: {
+    position: "absolute",
+    top: -8,
+    right: -8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+    borderWidth: 2,
+    borderColor: "#fff",
+    zIndex: 100,
   },
   sizeOptions: {
     flexDirection: "row",
@@ -343,34 +378,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     letterSpacing: -0.2,
-  },
-  footer: {
-    flexDirection: "row",
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  secondaryButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    alignItems: "center",
-  },
-  secondaryButtonText: {
-    fontSize: 17,
-    fontWeight: "600",
-    letterSpacing: -0.4,
-  },
-  primaryButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  primaryButtonText: {
-    fontSize: 17,
-    fontWeight: "600",
-    letterSpacing: -0.4,
   },
 });

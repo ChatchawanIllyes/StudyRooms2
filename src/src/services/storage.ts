@@ -264,6 +264,7 @@ export const getUserSettings = async (): Promise<UserSettings> => {
       ? JSON.parse(data)
       : {
           dailyGoal: 120,
+          dailyGoalMinutes: 120,
           breakDuration: 5,
           focusDuration: 25,
           soundEnabled: true,
@@ -272,6 +273,7 @@ export const getUserSettings = async (): Promise<UserSettings> => {
     console.error("Error loading settings:", error);
     return {
       dailyGoal: 120,
+      dailyGoalMinutes: 120,
       breakDuration: 5,
       focusDuration: 25,
       soundEnabled: true,

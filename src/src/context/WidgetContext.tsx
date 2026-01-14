@@ -109,7 +109,42 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
     try {
       const saved = await AsyncStorage.getItem(STORAGE_KEY);
       if (saved) {
-        setWidgets(JSON.parse(saved));
+        const loadedWidgets: WidgetConfig[] = JSON.parse(saved);
+
+        // Validate widget positions to prevent overlaps
+        const validatedWidgets: WidgetConfig[] = [];
+        const occupiedPositions = new Set<number>();
+
+        for (const widget of loadedWidgets) {
+          // Get all positions this widget would occupy
+          const widgetPositions = getPositionsForSize(widget.position, widget.size);
+
+          // Check if any of these positions are already occupied
+          const hasConflict = widgetPositions.some(pos => occupiedPositions.has(pos));
+
+          // Check if widget position is valid for the grid
+          const isValidPosition =
+            widget.position >= 0 &&
+            widget.position <= 5 &&
+            widgetPositions.every(pos => pos >= 0 && pos <= 5);
+
+          if (!hasConflict && isValidPosition) {
+            // No conflict, add the widget and mark positions as occupied
+            validatedWidgets.push(widget);
+            widgetPositions.forEach(pos => occupiedPositions.add(pos));
+          } else {
+            // Log the conflict for debugging
+            console.warn(`Skipping widget ${widget.id} (${widget.type}) due to position conflict or invalid position`);
+          }
+        }
+
+        setWidgets(validatedWidgets);
+
+        // If we removed any widgets, save the cleaned state
+        if (validatedWidgets.length !== loadedWidgets.length) {
+          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(validatedWidgets));
+          console.log(`Cleaned up ${loadedWidgets.length - validatedWidgets.length} conflicting widget(s)`);
+        }
       }
     } catch (error) {
       console.error("Failed to load widgets:", error);

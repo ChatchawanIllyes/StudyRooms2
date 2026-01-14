@@ -62,11 +62,14 @@ export default function StatsScreen({ navigation }: StatsScreenProps) {
         monthMinutes += minutes;
       }
 
-      // Subject breakdown
-      stat.sessions?.forEach((session) => {
-        const subject = session.subject || "Other";
-        subjectMinutes[subject] =
-          (subjectMinutes[subject] || 0) + (session.minutes || 0);
+      // Subject breakdown - aggregate by subject ID
+      Object.entries(stat.subjectBreakdown || {}).forEach(([subjectId, minutes]) => {
+        // Find subject name by ID for display
+        const subjectData = subjects.find((s) => s.id === subjectId);
+        const subjectName = subjectData?.name || subjectId || "Other";
+
+        subjectMinutes[subjectName] =
+          (subjectMinutes[subjectName] || 0) + minutes;
       });
     });
 

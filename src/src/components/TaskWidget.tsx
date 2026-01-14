@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -57,6 +57,7 @@ export default function TaskWidget({
   const [selectedDueDate, setSelectedDueDate] = useState<Date | undefined>(
     undefined
   );
+  const timeoutRefs = useRef<NodeJS.Timeout[]>([]);
 
   // Calculate widget dimensions based on size
   const getDimensions = () => {
@@ -94,6 +95,14 @@ export default function TaskWidget({
   };
 
   const maxTasks = getMaxTasks();
+
+  // Cleanup all timeouts on unmount
+  useEffect(() => {
+    return () => {
+      timeoutRefs.current.forEach((timeout) => clearTimeout(timeout));
+      timeoutRefs.current = [];
+    };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -479,7 +488,8 @@ export default function TaskWidget({
                         ]}
                         onPress={() => {
                           setShowAddModal(false);
-                          setTimeout(() => setShowCalendar(true), 300);
+                          const timeout = setTimeout(() => setShowCalendar(true), 300);
+                          timeoutRefs.current.push(timeout);
                         }}
                       >
                         <Ionicons
@@ -548,7 +558,8 @@ export default function TaskWidget({
                         ]}
                         onPress={() => {
                           setShowAddModal(false);
-                          setTimeout(() => setShowCategoryPicker(true), 300);
+                          const timeout = setTimeout(() => setShowCategoryPicker(true), 300);
+                          timeoutRefs.current.push(timeout);
                         }}
                       >
                         <Ionicons
@@ -622,7 +633,8 @@ export default function TaskWidget({
           animationType="fade"
           onRequestClose={() => {
             setShowCalendar(false);
-            setTimeout(() => setShowAddModal(true), 300);
+            const timeout = setTimeout(() => setShowAddModal(true), 300);
+            timeoutRefs.current.push(timeout);
           }}
         >
           <CalendarPicker
@@ -630,11 +642,13 @@ export default function TaskWidget({
             onSelectDate={(date) => {
               setSelectedDueDate(date);
               setShowCalendar(false);
-              setTimeout(() => setShowAddModal(true), 300);
+              const timeout = setTimeout(() => setShowAddModal(true), 300);
+              timeoutRefs.current.push(timeout);
             }}
             onClose={() => {
               setShowCalendar(false);
-              setTimeout(() => setShowAddModal(true), 300);
+              const timeout = setTimeout(() => setShowAddModal(true), 300);
+              timeoutRefs.current.push(timeout);
             }}
             colors={colors}
             accentColor={accentColor}
@@ -650,7 +664,8 @@ export default function TaskWidget({
           animationType="fade"
           onRequestClose={() => {
             setShowCategoryPicker(false);
-            setTimeout(() => setShowAddModal(true), 300);
+            const timeout = setTimeout(() => setShowAddModal(true), 300);
+            timeoutRefs.current.push(timeout);
           }}
         >
           <TouchableOpacity
@@ -658,7 +673,8 @@ export default function TaskWidget({
             activeOpacity={1}
             onPress={() => {
               setShowCategoryPicker(false);
-              setTimeout(() => setShowAddModal(true), 300);
+              const timeout = setTimeout(() => setShowAddModal(true), 300);
+              timeoutRefs.current.push(timeout);
             }}
           >
             <TouchableOpacity
@@ -689,7 +705,8 @@ export default function TaskWidget({
                     onPress={() => {
                       setSelectedCategory(undefined);
                       setShowCategoryPicker(false);
-                      setTimeout(() => setShowAddModal(true), 300);
+                      const timeout = setTimeout(() => setShowAddModal(true), 300);
+                      timeoutRefs.current.push(timeout);
                     }}
                   >
                     <Text style={[styles.subjectText, { color: colors.text }]}>
@@ -706,7 +723,8 @@ export default function TaskWidget({
                       onPress={() => {
                         setSelectedCategory(subject.id);
                         setShowCategoryPicker(false);
-                        setTimeout(() => setShowAddModal(true), 300);
+                        const timeout = setTimeout(() => setShowAddModal(true), 300);
+                        timeoutRefs.current.push(timeout);
                       }}
                     >
                       <View

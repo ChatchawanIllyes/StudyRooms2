@@ -40,6 +40,7 @@ export default function MyRoomsScreen({ navigation }: MyRoomsScreenProps) {
   const [showActionButtons, setShowActionButtons] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState(false);
+  const timeoutRefs = React.useRef<NodeJS.Timeout[]>([]);
 
   // Animation values
   const rotation = useSharedValue(0);
@@ -52,7 +53,12 @@ export default function MyRoomsScreen({ navigation }: MyRoomsScreenProps) {
     const unsubscribe = navigation.addListener("focus", () => {
       initializeRooms();
     });
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      // Cleanup all timeouts
+      timeoutRefs.current.forEach((timeout) => clearTimeout(timeout));
+      timeoutRefs.current = [];
+    };
   }, [navigation]);
 
   const initializeRooms = async () => {
@@ -98,23 +104,26 @@ export default function MyRoomsScreen({ navigation }: MyRoomsScreenProps) {
       button1TranslateY.value = withTiming(20, { duration: 150 });
       button2Opacity.value = withTiming(0, { duration: 150 });
       button2TranslateY.value = withTiming(20, { duration: 150 });
-      setTimeout(() => setShowActionButtons(false), 150);
+      const timeout = setTimeout(() => setShowActionButtons(false), 150);
+      timeoutRefs.current.push(timeout);
     } else {
       // Show buttons
       setShowActionButtons(true);
       rotation.value = withSpring(45);
       button1Opacity.value = withTiming(1, { duration: 200 });
       button1TranslateY.value = withSpring(0);
-      setTimeout(() => {
+      const timeout = setTimeout(() => {
         button2Opacity.value = withTiming(1, { duration: 200 });
         button2TranslateY.value = withSpring(0);
       }, 50);
+      timeoutRefs.current.push(timeout);
     }
   };
 
   const handleNavigate = (screen: string) => {
     toggleActionButtons();
-    setTimeout(() => navigation.navigate(screen), 200);
+    const timeout = setTimeout(() => navigation.navigate(screen), 200);
+    timeoutRefs.current.push(timeout);
   };
 
   // Animated styles

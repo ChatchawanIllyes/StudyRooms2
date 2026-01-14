@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { TouchableOpacity, Text, StyleSheet } from "react-native";
 import Animated, {
   useAnimatedStyle,
@@ -17,6 +17,7 @@ interface StudyFABProps {
 export default function StudyFAB({ navigation, currentScreen }: StudyFABProps) {
   const { colors } = useTheme();
   const [showMenuButtons, setShowMenuButtons] = useState(false);
+  const timeoutRefs = useRef<NodeJS.Timeout[]>([]);
 
   // Animation values
   const rotation = useSharedValue(0);
@@ -26,6 +27,14 @@ export default function StudyFAB({ navigation, currentScreen }: StudyFABProps) {
   const button2TranslateY = useSharedValue(20);
   const button3Opacity = useSharedValue(0);
   const button3TranslateY = useSharedValue(20);
+
+  // Cleanup all timeouts on unmount
+  useEffect(() => {
+    return () => {
+      timeoutRefs.current.forEach((timeout) => clearTimeout(timeout));
+      timeoutRefs.current = [];
+    };
+  }, []);
 
   const toggleMenuButtons = () => {
     if (showMenuButtons) {
@@ -37,21 +46,24 @@ export default function StudyFAB({ navigation, currentScreen }: StudyFABProps) {
       button2TranslateY.value = withTiming(20, { duration: 150 });
       button3Opacity.value = withTiming(0, { duration: 150 });
       button3TranslateY.value = withTiming(20, { duration: 150 });
-      setTimeout(() => setShowMenuButtons(false), 150);
+      const timeout = setTimeout(() => setShowMenuButtons(false), 150);
+      timeoutRefs.current.push(timeout);
     } else {
       // Show buttons
       setShowMenuButtons(true);
       rotation.value = withSpring(45);
       button1Opacity.value = withTiming(1, { duration: 200 });
       button1TranslateY.value = withSpring(0);
-      setTimeout(() => {
+      const timeout1 = setTimeout(() => {
         button2Opacity.value = withTiming(1, { duration: 200 });
         button2TranslateY.value = withSpring(0);
       }, 50);
-      setTimeout(() => {
+      timeoutRefs.current.push(timeout1);
+      const timeout2 = setTimeout(() => {
         button3Opacity.value = withTiming(1, { duration: 200 });
         button3TranslateY.value = withSpring(0);
       }, 100);
+      timeoutRefs.current.push(timeout2);
     }
   };
 
@@ -61,7 +73,8 @@ export default function StudyFAB({ navigation, currentScreen }: StudyFABProps) {
       return;
     }
     toggleMenuButtons();
-    setTimeout(() => navigation.navigate(screen), 200);
+    const timeout = setTimeout(() => navigation.navigate(screen), 200);
+    timeoutRefs.current.push(timeout);
   };
 
   // Animated styles

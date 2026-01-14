@@ -89,9 +89,25 @@ export function StudyTimerProvider({ children }: { children: ReactNode }) {
     } else if (isPaused) {
       // When paused, elapsed = accumulated
       setElapsedMs(accumulatedMs);
+
+      // Cleanup any existing interval
+      return () => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+      };
     } else {
       // Idle state
       setElapsedMs(0);
+
+      // Cleanup any existing interval
+      return () => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+      };
     }
   }, [isRunning, isPaused, segmentStartedAt, accumulatedMs]);
 

@@ -14,6 +14,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Notifications from "expo-notifications";
 import { useTheme } from "../context/ThemeContext";
 import * as StorageService from "../services/storage";
 import { StudySession } from "../types";
@@ -278,8 +279,17 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
 
   const saveStudySession = async (subjectId: string, duration: number) => {
     try {
+      // Generate unique ID (Supabase-compatible format)
+      const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Find subject name from ID
+      const subject = DEFAULT_SUBJECTS.find((s) => s.id === subjectId);
+      const subjectName = subject?.name || "Other";
+
       const session: StudySession = {
-        subject: subjectId,
+        id: sessionId,
+        subject: subjectName,
+        subjectId: subjectId,
         duration: duration,
         date: new Date().toISOString(),
       };

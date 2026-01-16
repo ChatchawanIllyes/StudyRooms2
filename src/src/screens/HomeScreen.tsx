@@ -713,6 +713,7 @@ export default function HomeScreen() {
             left,
             top,
             zIndex: 15,
+            overflow: "visible",
           }}
         >
           <WidgetTile
@@ -721,17 +722,21 @@ export default function HomeScreen() {
             position={placementMode.previewPosition}
             isEditMode={false}
             onPress={() => {}}
+            isPreview={true}
           />
           {/* Checkmark button on preview */}
           <TouchableOpacity
             style={[
               styles.confirmPlacementButton,
-              { backgroundColor: accentColor },
+              {
+                backgroundColor: accentColor,
+                zIndex: 100,
+              },
             ]}
             onPress={handleConfirmPlacement}
             activeOpacity={0.8}
           >
-            <Ionicons name="checkmark" size={24} color="#FFFFFF" />
+            <Ionicons name="checkmark" size={26} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
       );
@@ -808,8 +813,10 @@ export default function HomeScreen() {
           style={{ flex: 1 }}
           activeOpacity={1}
           onPress={() => placementMode && handleCancelPlacement()}
+          disabled={!placementMode}
+          pointerEvents={placementMode ? "auto" : "box-none"}
         >
-          <View style={{ flex: 1 }} onStartShouldSetResponder={() => false}>
+          <View style={{ flex: 1 }}>
             {/* Header */}
             <View style={styles.header}>
               <View style={styles.headerText}>
@@ -1070,15 +1077,15 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 8,
     right: 8,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 10,
   },
 });

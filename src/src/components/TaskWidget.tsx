@@ -233,8 +233,8 @@ export default function TaskWidget({
   ];
 
   const displayTasks = isPreview ? previewTasks : tasks;
-  const visibleTasks = displayTasks.slice(0, maxTasks);
-  const remainingCount = Math.max(0, displayTasks.length - maxTasks);
+  // Show all tasks - ScrollView handles overflow
+  const visibleTasks = displayTasks;
 
   return (
     <>
@@ -244,7 +244,8 @@ export default function TaskWidget({
           {
             width: dimensions.width,
             height: dimensions.height,
-            backgroundColor: "transparent",
+            backgroundColor: colors.background,
+            borderColor: colors.border,
             overflow: isPreview ? "visible" : "hidden",
           },
         ]}
@@ -268,23 +269,25 @@ export default function TaskWidget({
         )}
 
         {/* Header with title and add button */}
-        <TouchableOpacity
-          style={styles.header}
-          onPress={handleTilePress}
-          disabled={isEditMode || isPreview}
-          activeOpacity={0.7}
-        >
-          <Text
-            style={[
-              styles.headerTitle,
-              {
-                color: colors.text,
-                fontSize: is1x1 ? 16 : 18,
-              },
-            ]}
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={handleTilePress}
+            disabled={isEditMode || isPreview}
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            Tasks
-          </Text>
+            <Text
+              style={[
+                styles.headerTitle,
+                {
+                  color: colors.text,
+                  fontSize: is1x1 ? 16 : 18,
+                },
+              ]}
+            >
+              Tasks
+            </Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[
               styles.addButton,
@@ -301,24 +304,23 @@ export default function TaskWidget({
           >
             <Ionicons name="add" size={is1x1 ? 16 : 18} color="#FFFFFF" />
           </TouchableOpacity>
-        </TouchableOpacity>
+        </View>
 
         {/* Tasks List */}
-        <ScrollView
-          style={styles.tasksList}
-          contentContainerStyle={styles.tasksListContent}
-          showsVerticalScrollIndicator={false}
-          scrollEnabled={!isEditMode && !isPreview}
-          nestedScrollEnabled={true}
-          bounces={false}
-        >
+        <View style={styles.tasksListWrapper}>
+          <ScrollView
+            style={styles.tasksList}
+            contentContainerStyle={styles.tasksListContent}
+            showsVerticalScrollIndicator={true}
+            scrollEnabled={!isEditMode && !isPreview}
+            nestedScrollEnabled={true}
+            bounces={true}
+            alwaysBounceVertical={false}
+            scrollEventThrottle={16}
+            removeClippedSubviews={false}
+          >
           {visibleTasks.length === 0 ? (
-            <TouchableOpacity
-              style={styles.emptyState}
-              onPress={handleTilePress}
-              disabled={isEditMode || isPreview}
-              activeOpacity={0.7}
-            >
+            <View style={styles.emptyState}>
               <Ionicons
                 name="checkmark-circle-outline"
                 size={is1x1 ? 32 : 40}
@@ -332,7 +334,7 @@ export default function TaskWidget({
               >
                 No tasks yet
               </Text>
-            </TouchableOpacity>
+            </View>
           ) : (
             <>
               {visibleTasks.map((task) => (
@@ -349,19 +351,10 @@ export default function TaskWidget({
                   getSubject={getSubject}
                 />
               ))}
-              {remainingCount > 0 && (
-                <Text
-                  style={[
-                    styles.remainingText,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  +{remainingCount} more task{remainingCount > 1 ? "s" : ""}
-                </Text>
-              )}
             </>
           )}
-        </ScrollView>
+          </ScrollView>
+        </View>
       </View>
 
       {/* Add Task Modal */}
@@ -997,14 +990,10 @@ function TaskItem({
 const styles = StyleSheet.create({
   container: {
     borderRadius: 16,
+    borderWidth: 1,
     padding: 16,
-    justifyContent: "flex-start",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
     position: "relative",
+    overflow: "hidden",
   },
   titleContainer: {
     position: "absolute",
@@ -1043,12 +1032,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  tasksListWrapper: {
+    flex: 1,
+    minHeight: 0,
+  },
   tasksList: {
-    flexGrow: 1,
-    flexShrink: 1,
+    flex: 1,
   },
   tasksListContent: {
     gap: 8,
+    paddingBottom: 8,
   },
   emptyState: {
     flex: 1,

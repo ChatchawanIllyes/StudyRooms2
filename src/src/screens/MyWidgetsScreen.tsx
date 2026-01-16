@@ -41,7 +41,7 @@ const AVAILABLE_WIDGETS: Array<{
   },
   {
     type: "stats-heatmap",
-    name: "Study Heatmap",
+    name: "Heatmap",
     icon: "grid-outline",
     description: "GitHub-style heatmap of your study activity",
   },
@@ -195,6 +195,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
+    paddingTop: 4,
   },
   section: {
     marginBottom: 32,
@@ -219,6 +220,8 @@ const styles = StyleSheet.create({
     width: "50%",
     paddingHorizontal: 8,
     marginBottom: 16,
+    marginTop: 20,
+    overflow: "visible",
   },
   installedBadge: {
     flexDirection: "row",

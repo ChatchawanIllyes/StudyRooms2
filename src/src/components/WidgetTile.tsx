@@ -11,6 +11,7 @@ import { useTheme } from "../context/ThemeContext";
 import { WidgetType, WidgetSize, useWidgets } from "../context/WidgetContext";
 import TimerWidget from "./TimerWidget";
 import TaskWidget from "./TaskWidget";
+import StatsWidget from "./StatsWidget";
 import StatsHeatmapWidget from "./StatsHeatmapWidget";
 import Animated, {
   useAnimatedStyle,
@@ -68,7 +69,7 @@ const getWidgetInfo = (type: WidgetType) => {
       };
     case "stats-heatmap":
       return {
-        name: "Study Heatmap",
+        name: "Heatmap",
         icon: "grid-outline" as const,
         preview: "Activity",
         subtext: "",
@@ -145,7 +146,7 @@ export default function WidgetTile({
         widgetId !== undefined &&
         position !== undefined
     )
-    .minDistance(10) // Minimum distance before drag starts
+    .minDistance(15) // Increased minimum distance before drag starts to avoid conflicts with scrolling
     .onStart(() => {
       if (onDragStart) {
         runOnJS(onDragStart)();
@@ -262,7 +263,7 @@ export default function WidgetTile({
               {
                 width: dimensions.width,
                 height: dimensions.height,
-                backgroundColor: colors.card,
+                backgroundColor: 'transparent',
                 borderColor:
                   isEditMode || isInResizeMode ? accentColor : "transparent",
                 borderWidth: 2,
@@ -310,7 +311,75 @@ export default function WidgetTile({
   }
 
   // If tasks widget, render TaskWidget component instead
+  // IMPORTANT: Don't wrap in GestureDetector when not in edit mode to allow scrolling
   if (type === "tasks") {
+    const taskWidgetContent = (
+      <View
+        style={[
+          {
+            width: dimensions.width,
+            height: dimensions.height,
+            backgroundColor: 'transparent',
+            borderColor:
+              isEditMode || isInResizeMode ? accentColor : "transparent",
+            borderWidth: 2,
+            borderRadius: 16,
+            overflow: "visible",
+          },
+        ]}
+        pointerEvents={isEditMode || isInResizeMode ? "auto" : "box-none"}
+      >
+        <TaskWidget
+          size={size}
+          isEditMode={isEditMode || isInResizeMode}
+          onNavigateToTasks={() => onPress?.()}
+          isPreview={isPreview}
+        />
+      </View>
+    );
+
+    return (
+      <Animated.View style={[animatedStyle]}>
+        {/* Edit Mode Controls - Outside the clipped container */}
+        {isEditMode && !isInResizeMode && (
+          <>
+            <TouchableOpacity
+              style={[styles.removeButton, { backgroundColor: "#ff3b30" }]}
+              onPress={onRemove}
+            >
+              <Ionicons name="close" size={16} color="#ffffff" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.resizeButton,
+                {
+                  backgroundColor: "rgba(0, 0, 0, 0.75)",
+                  borderWidth: 2,
+                  borderColor: "rgba(255, 255, 255, 0.3)",
+                },
+              ]}
+              onPress={handleResizePress}
+            >
+              <Ionicons name="expand-outline" size={14} color="#ffffff" />
+            </TouchableOpacity>
+          </>
+        )}
+
+        {/* Only wrap in GestureDetector when in edit mode */}
+        {isEditMode && !isInResizeMode && !isPreview && widgetId !== undefined ? (
+          <GestureDetector gesture={panGesture}>
+            <Animated.View>{taskWidgetContent}</Animated.View>
+          </GestureDetector>
+        ) : (
+          taskWidgetContent
+        )}
+      </Animated.View>
+    );
+  }
+
+  // If stats widget, render StatsWidget component instead
+  if (type === "stats") {
     return (
       <GestureDetector gesture={panGesture}>
         <Animated.View style={[animatedStyle]}>
@@ -354,11 +423,11 @@ export default function WidgetTile({
               </>
             )}
 
-            <TaskWidget
+            <StatsWidget
               size={size}
               isEditMode={isEditMode || isInResizeMode}
-              onNavigateToTasks={() => onPress?.()}
               isPreview={isPreview}
+              onNavigateToStats={() => onPress?.()}
             />
           </View>
         </Animated.View>
@@ -439,7 +508,7 @@ export default function WidgetTile({
             {
               width: dimensions.width,
               height: dimensions.height,
-              backgroundColor: colors.card,
+              backgroundColor: 'transparent',
               borderColor:
                 isEditMode || isInResizeMode ? accentColor : "transparent",
               borderWidth: 2,
@@ -455,10 +524,19 @@ export default function WidgetTile({
                   backgroundColor: accentColor,
                   borderWidth: 2,
                   borderColor: colors.background,
+                  position: 'absolute',
+                  top: 8,
+                  left: 8,
+                  right: 8,
+                  paddingVertical: 6,
+                  paddingHorizontal: 12,
+                  zIndex: 20,
+                  alignSelf: 'center',
+                  maxWidth: '90%',
                 },
               ]}
             >
-              <Text style={styles.titleBadgeText}>{info.name}</Text>
+              <Text style={styles.titleBadgeText} numberOfLines={1} ellipsizeMode="tail">{info.name}</Text>
             </View>
           )}
 

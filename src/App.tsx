@@ -22,12 +22,33 @@ import SettingsScreen from "./src/screens/SettingsScreen";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
 import { WidgetProvider } from "./src/context/WidgetContext";
 import { StudyTimerProvider } from "./src/context/StudyTimerContext";
+import * as StorageService from "./src/services/storage";
 
 const Tab = createBottomTabNavigator();
 
 function AppContent() {
   const { isDark, accentColor } = useTheme();
   const colorScheme = isDark ? "dark" : "light";
+
+  // Initialize dummy data on app startup if no data exists
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        const sessions = await StorageService.getSessions();
+        if (sessions.length === 0) {
+          console.log("No study sessions found. Initializing dummy data...");
+          const count = await StorageService.addDummyStudySessions();
+          console.log(`Initialized ${count} dummy study sessions for preview`);
+        } else {
+          console.log(`Found ${sessions.length} existing study sessions`);
+        }
+      } catch (error) {
+        console.error("Error initializing dummy data:", error);
+      }
+    };
+
+    initializeData();
+  }, []);
 
   const colors = {
     background: isDark ? "#000000" : "#ffffff",

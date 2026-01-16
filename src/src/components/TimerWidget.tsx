@@ -5,17 +5,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
-  Platform,
   Modal,
   ScrollView,
 } from "react-native";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSequence,
-  Easing,
-} from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { useStudyTimer } from "../context/StudyTimerContext";
 import { useTheme } from "../context/ThemeContext";
@@ -30,27 +22,21 @@ interface TimerWidgetProps {
   isPreview?: boolean;
 }
 
-const SEGMENT_MS = 5 * 60 * 1000; // 5 minutes per bead
-const CYCLE_MS = 12 * SEGMENT_MS; // 60 minutes per cycle
-
 export default function TimerWidget({
   size,
   isEditMode,
   onNavigateToTimer,
   isPreview = false,
 }: TimerWidgetProps) {
-  const { colors, accentColor } = useTheme();
+  const { colors, accentColor, isDark } = useTheme();
   const {
     elapsedMs,
     isRunning,
     isPaused,
     start,
-    pause,
-    resume,
     stopAndSave,
     currentSubject,
     showSubjectModal,
-    setShowSubjectModal,
     startWithSubject,
     changeSubject,
   } = useStudyTimer();
@@ -58,7 +44,6 @@ export default function TimerWidget({
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [showChangeSubjectModal, setShowChangeSubjectModal] = useState(false);
 
-  // Load subjects
   useEffect(() => {
     loadSubjects();
   }, []);
@@ -77,7 +62,6 @@ export default function TimerWidget({
     setShowChangeSubjectModal(false);
   };
 
-  // Calculate widget dimensions based on size
   const getDimensions = () => {
     const { width } = Dimensions.get("window");
     const PADDING = 20;
@@ -98,19 +82,15 @@ export default function TimerWidget({
   };
 
   const dimensions = getDimensions();
-  const is2x2 = size === "2x2";
   const is1x1 = size === "1x1";
+  const is2x1 = size === "2x1";
+  const is1x2 = size === "1x2";
+  const is2x2 = size === "2x2";
 
-  // Use default state for preview, otherwise use actual timer state
   const displayElapsedMs = isPreview ? 0 : elapsedMs;
   const displayIsRunning = isPreview ? false : isRunning;
   const displayIsPaused = isPreview ? false : isPaused;
 
-  // Calculate beads state
-  const activeDots = Math.floor((displayElapsedMs % CYCLE_MS) / SEGMENT_MS); // 0..11
-  const cycleIndex = Math.floor(displayElapsedMs / CYCLE_MS) + 1; // Hour 1, Hour 2, ...
-
-  // Format elapsed time for display
   const formatTime = (ms: number): string => {
     const totalSeconds = Math.floor(ms / 1000);
     const hours = Math.floor(totalSeconds / 3600);
@@ -131,10 +111,8 @@ export default function TimerWidget({
     if (isEditMode || isPreview) return;
 
     if (!isRunning && !isPaused && elapsedMs === 0) {
-      // Starting fresh - show subject modal
       start();
     } else {
-      // Running or paused - stop and save
       await stopAndSave();
     }
   };
@@ -145,32 +123,430 @@ export default function TimerWidget({
     }
   };
 
-  const getPrimaryControlLabel = () => {
-    if (!isRunning && !isPaused && elapsedMs === 0) return "Study";
-    return "Stop";
+  const getStatusInfo = () => {
+    if (displayIsRunning) return { text: "Studying", color: accentColor };
+    if (displayIsPaused) return { text: "Paused", color: "#FF9500" };
+    return { text: "Ready", color: colors.textSecondary };
   };
 
-  const getPrimaryControlIcon = () => {
-    if (!isRunning && !isPaused && elapsedMs === 0) return "play";
-    return "stop";
+  const statusInfo = getStatusInfo();
+
+
+  // Simplified balanced layout for all sizes
+  const renderSimplifiedContent = () => {
+    if (is1x1) {
+      // 1x1: New simple layout - Timer at top, status bar, buttons at bottom
+      return (
+        <View style={styles.grid1x1New}>
+          {/* Timer Display - Large at top */}
+          <TouchableOpacity
+            style={styles.timerSection}
+            onPress={handleTilePress}
+            disabled={isEditMode || isPreview}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.timerValue, { color: colors.text }]}>
+              {formatTime(displayElapsedMs)}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Status Bar - Thin in middle */}
+          <View style={styles.statusBar}>
+            <View
+              style={[styles.statusDot1x1, { backgroundColor: statusInfo.color }]}
+            />
+            <Text
+              style={[
+                styles.statusText,
+                { color: statusInfo.color },
+              ]}
+              numberOfLines={1}
+            >
+              {statusInfo.text}
+            </Text>
+          </View>
+
+          {/* Buttons Row - Study and Subject side by side */}
+          <View style={styles.buttonsRow}>
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                {
+                  borderColor: isEditMode ? `${accentColor}40` : accentColor,
+                  opacity: isEditMode ? 0.4 : 1,
+                },
+              ]}
+              onPress={handlePrimaryControl}
+              disabled={isEditMode || isPreview}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={
+                  !isRunning && !isPaused && elapsedMs === 0 ? "play" : "stop"
+                }
+                size={18}
+                color={accentColor}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                {
+                  borderColor: !isPreview && currentSubject
+                    ? (isEditMode ? `${currentSubject.color}40` : currentSubject.color)
+                    : (isEditMode ? `${colors.border}40` : colors.border),
+                  opacity: isEditMode ? 0.4 : 1,
+                },
+              ]}
+              onPress={() =>
+                !isPreview && (isRunning || isPaused) && currentSubject
+                  ? setShowChangeSubjectModal(true)
+                  : handleTilePress()
+              }
+              disabled={isEditMode || isPreview}
+              activeOpacity={0.7}
+            >
+              {!isPreview && currentSubject ? (
+                <Ionicons
+                  name={currentSubject.icon}
+                  size={18}
+                  color={currentSubject.color}
+                />
+              ) : (
+                <Ionicons name="book-outline" size={18} color={colors.border} />
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    if (is2x1) {
+      // 2x1: Horizontal row of 4 equal boxes
+      return (
+        <View style={styles.row2x1}>
+          {/* Timer Display */}
+          <TouchableOpacity
+            style={styles.box2x1}
+            onPress={handleTilePress}
+            disabled={isEditMode || isPreview}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="time-outline" size={22} color={accentColor} />
+            <Text style={[styles.boxLabel, { color: colors.textSecondary }]}>
+              Time
+            </Text>
+            <Text style={[styles.boxValue, { color: colors.text, fontSize: 15 }]}>
+              {formatTime(displayElapsedMs)}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Status */}
+          <TouchableOpacity
+            style={styles.box2x1}
+            onPress={handleTilePress}
+            disabled={isEditMode || isPreview}
+            activeOpacity={0.7}
+          >
+            <View
+              style={[styles.statusDotLarge, { backgroundColor: statusInfo.color }]}
+            />
+            <Text style={[styles.boxLabel, { color: colors.textSecondary }]}>
+              Status
+            </Text>
+            <Text style={[styles.boxValue, { color: statusInfo.color, fontSize: 13 }]}>
+              {statusInfo.text}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Subject */}
+          <TouchableOpacity
+            style={styles.box2x1}
+            onPress={() =>
+              !isPreview && (isRunning || isPaused) && currentSubject
+                ? setShowChangeSubjectModal(true)
+                : handleTilePress()
+            }
+            disabled={isEditMode || isPreview}
+            activeOpacity={0.7}
+          >
+            {!isPreview && currentSubject ? (
+              <Ionicons
+                name={currentSubject.icon}
+                size={22}
+                color={currentSubject.color}
+              />
+            ) : (
+              <Ionicons name="book-outline" size={22} color={colors.border} />
+            )}
+            <Text style={[styles.boxLabel, { color: colors.textSecondary }]}>
+              Subject
+            </Text>
+            <Text
+              style={[
+                styles.boxValue,
+                {
+                  color: !isPreview && currentSubject ? currentSubject.color : colors.textSecondary,
+                  fontSize: 11,
+                },
+              ]}
+              numberOfLines={1}
+            >
+              {!isPreview && currentSubject ? currentSubject.name : "None"}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Study Button */}
+          <TouchableOpacity
+            style={[
+              styles.box2x1,
+              styles.outlinedButton,
+              {
+                borderColor: isEditMode ? `${accentColor}40` : accentColor,
+                opacity: isEditMode ? 0.4 : 1,
+              },
+            ]}
+            onPress={handlePrimaryControl}
+            disabled={isEditMode || isPreview}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={
+                !isRunning && !isPaused && elapsedMs === 0 ? "play-circle" : "stop-circle"
+              }
+              size={32}
+              color={accentColor}
+            />
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (is1x2) {
+      // 1x2: Vertical stack of 4 equal boxes
+      return (
+        <View style={styles.column1x2}>
+          {/* Timer Display */}
+          <TouchableOpacity
+            style={styles.box1x2}
+            onPress={handleTilePress}
+            disabled={isEditMode || isPreview}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="time-outline" size={24} color={accentColor} />
+            <Text style={[styles.boxLabel, { color: colors.textSecondary }]}>
+              Time
+            </Text>
+            <Text style={[styles.boxValue, { color: colors.text, fontSize: 18 }]}>
+              {formatTime(displayElapsedMs)}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Status */}
+          <TouchableOpacity
+            style={styles.box1x2}
+            onPress={handleTilePress}
+            disabled={isEditMode || isPreview}
+            activeOpacity={0.7}
+          >
+            <View
+              style={[styles.statusDotLarge, { backgroundColor: statusInfo.color }]}
+            />
+            <Text style={[styles.boxLabel, { color: colors.textSecondary }]}>
+              Status
+            </Text>
+            <Text style={[styles.boxValue, { color: statusInfo.color }]}>
+              {statusInfo.text}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Subject */}
+          <TouchableOpacity
+            style={styles.box1x2}
+            onPress={() =>
+              !isPreview && (isRunning || isPaused) && currentSubject
+                ? setShowChangeSubjectModal(true)
+                : handleTilePress()
+            }
+            disabled={isEditMode || isPreview}
+            activeOpacity={0.7}
+          >
+            {!isPreview && currentSubject ? (
+              <Ionicons
+                name={currentSubject.icon}
+                size={24}
+                color={currentSubject.color}
+              />
+            ) : (
+              <Ionicons name="book-outline" size={24} color={colors.border} />
+            )}
+            <Text style={[styles.boxLabel, { color: colors.textSecondary }]}>
+              Subject
+            </Text>
+            <Text
+              style={[
+                styles.boxValue,
+                {
+                  color: !isPreview && currentSubject ? currentSubject.color : colors.textSecondary,
+                  fontSize: 12,
+                },
+              ]}
+              numberOfLines={1}
+            >
+              {!isPreview && currentSubject ? currentSubject.name : "None"}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Study Button */}
+          <TouchableOpacity
+            style={[
+              styles.box1x2,
+              styles.outlinedButton,
+              {
+                borderColor: isEditMode ? `${accentColor}40` : accentColor,
+                opacity: isEditMode ? 0.4 : 1,
+              },
+            ]}
+            onPress={handlePrimaryControl}
+            disabled={isEditMode || isPreview}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={
+                !isRunning && !isPaused && elapsedMs === 0 ? "play-circle" : "stop-circle"
+              }
+              size={36}
+              color={accentColor}
+            />
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    // 2x2: Proper 2x2 grid using nested flex rows (like 1x2 but with 2 columns)
+    return (
+      <View style={styles.grid2x2}>
+        {/* Top Row */}
+        <View style={styles.row2x2}>
+          {/* Timer Display */}
+          <TouchableOpacity
+            style={styles.box2x2}
+            onPress={handleTilePress}
+            disabled={isEditMode || isPreview}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="time-outline" size={28} color={accentColor} />
+            <Text style={[styles.boxLabel, { color: colors.textSecondary }]}>
+              Time
+            </Text>
+            <Text style={[styles.boxValue2x2, { color: colors.text }]}>
+              {formatTime(displayElapsedMs)}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Status */}
+          <TouchableOpacity
+            style={styles.box2x2}
+            onPress={handleTilePress}
+            disabled={isEditMode || isPreview}
+            activeOpacity={0.7}
+          >
+            <View
+              style={[
+                styles.statusDotLarge,
+                { backgroundColor: statusInfo.color, width: 10, height: 10 },
+              ]}
+            />
+            <Text style={[styles.boxLabel, { color: colors.textSecondary }]}>
+              Status
+            </Text>
+            <Text style={[styles.boxValue2x2, { color: statusInfo.color }]}>
+              {statusInfo.text}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Bottom Row */}
+        <View style={styles.row2x2}>
+          {/* Subject */}
+          <TouchableOpacity
+            style={styles.box2x2}
+            onPress={() =>
+              !isPreview && (isRunning || isPaused) && currentSubject
+                ? setShowChangeSubjectModal(true)
+                : handleTilePress()
+            }
+            disabled={isEditMode || isPreview}
+            activeOpacity={0.7}
+          >
+            {!isPreview && currentSubject ? (
+              <Ionicons
+                name={currentSubject.icon}
+                size={28}
+                color={currentSubject.color}
+              />
+            ) : (
+              <Ionicons name="book-outline" size={28} color={colors.border} />
+            )}
+            <Text style={[styles.boxLabel, { color: colors.textSecondary }]}>
+              Subject
+            </Text>
+            <Text
+              style={[
+                styles.boxValue2x2,
+                {
+                  color: !isPreview && currentSubject ? currentSubject.color : colors.textSecondary,
+                  fontSize: 13,
+                },
+              ]}
+              numberOfLines={1}
+            >
+              {!isPreview && currentSubject ? currentSubject.name : "None"}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Study Button */}
+          <TouchableOpacity
+            style={[
+              styles.box2x2,
+              styles.outlinedButton,
+              {
+                borderColor: isEditMode ? `${accentColor}40` : accentColor,
+                opacity: isEditMode ? 0.4 : 1,
+              },
+            ]}
+            onPress={handlePrimaryControl}
+            disabled={isEditMode || isPreview}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={
+                !isRunning && !isPaused && elapsedMs === 0 ? "play-circle" : "stop-circle"
+              }
+              size={40}
+              color={accentColor}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
   };
 
   return (
     <>
-      <TouchableOpacity
+      <View
         style={[
           styles.container,
           {
             width: dimensions.width,
             height: dimensions.height,
-            backgroundColor: "transparent",
+            backgroundColor: colors.background,
+            borderColor: colors.border,
+            overflow: isPreview ? "visible" : "hidden",
           },
         ]}
-        activeOpacity={isEditMode ? 1 : 0.9}
-        onPress={handleTilePress}
-        disabled={isEditMode || isPreview}
       >
-        {/* Widget Title */}
         {isPreview && (
           <View
             style={[
@@ -188,196 +564,8 @@ export default function TimerWidget({
           </View>
         )}
 
-        {/* Top Section: Digital Time Display (60%) */}
-        <View
-          style={[
-            styles.topSection,
-            {
-              flex: is2x2 ? 6 : is1x1 ? 2.5 : size === "2x1" ? 2 : 5,
-              justifyContent: is1x1 || size === "2x1" ? "flex-start" : "center",
-              paddingTop: size === "2x1" ? 4 : 0,
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.timeText,
-              {
-                color: colors.text,
-                fontSize: is2x2
-                  ? 48
-                  : size === "1x2"
-                  ? 32
-                  : size === "2x1"
-                  ? 20
-                  : 28,
-                letterSpacing: is2x2 ? 3 : 2,
-                marginBottom: size === "2x1" ? 16 : 0,
-                lineHeight: size === "2x1" ? 20 : undefined,
-              },
-            ]}
-          >
-            {formatTime(displayElapsedMs)}
-          </Text>
-          {!is1x1 && size !== "2x1" && (
-            <Text
-              style={[
-                styles.statusText,
-                {
-                  color: displayIsRunning
-                    ? accentColor
-                    : displayIsPaused
-                    ? colors.textSecondary
-                    : colors.textSecondary,
-                },
-              ]}
-            >
-              {displayIsRunning
-                ? "● Active"
-                : displayIsPaused
-                ? "◐ Paused"
-                : "○ Ready"}
-            </Text>
-          )}
-        </View>
-
-        {/* Bottom Section: Beads Grid (40%) */}
-        <View style={[styles.bottomSection, { flex: is2x2 ? 4 : 3 }]}>
-          {/* Beads Grid: 2 rows × 6 columns */}
-          <View
-            style={[
-              styles.beadsContainer,
-              {
-                marginBottom: is2x2 ? 8 : size === "1x2" ? 6 : 4,
-              },
-            ]}
-          >
-            {/* Row 1 (beads 0-5) */}
-            <View style={styles.beadsRow}>
-              {[0, 1, 2, 3, 4, 5].map((i) => (
-                <Bead
-                  key={`bead-${i}`}
-                  isActive={i < activeDots}
-                  size={is2x2 ? 14 : size === "1x2" ? 10 : 8}
-                  activeColor="#FFFFFF"
-                  inactiveColor={colors.border}
-                />
-              ))}
-            </View>
-
-            {/* Row 2 (beads 6-11) */}
-            <View style={styles.beadsRow}>
-              {[6, 7, 8, 9, 10, 11].map((i) => (
-                <Bead
-                  key={`bead-${i}`}
-                  isActive={i < activeDots}
-                  size={is2x2 ? 14 : size === "1x2" ? 10 : 8}
-                  activeColor="#FFFFFF"
-                  inactiveColor={colors.border}
-                />
-              ))}
-            </View>
-          </View>
-
-          {/* Status text above controls for 1x1 and 2x1 */}
-          {(is1x1 || size === "2x1") && (
-            <Text
-              style={[
-                styles.statusTextAboveButtons,
-                {
-                  color: displayIsRunning
-                    ? accentColor
-                    : displayIsPaused
-                    ? colors.textSecondary
-                    : colors.textSecondary,
-                },
-              ]}
-            >
-              {displayIsRunning
-                ? "● Active"
-                : displayIsPaused
-                ? "◐ Paused"
-                : "○ Ready"}
-            </Text>
-          )}
-
-          {/* Controls */}
-          <View
-            style={[
-              styles.controlsRow,
-              {
-                justifyContent: "center",
-                alignItems: "center",
-              },
-            ]}
-          >
-            <TouchableOpacity
-              style={[
-                styles.controlButton,
-                {
-                  backgroundColor: isEditMode
-                    ? `${accentColor}20`
-                    : accentColor,
-                  opacity: isEditMode ? 0.4 : 1,
-                  paddingHorizontal: is1x1 || size === "1x2" ? 12 : 16,
-                },
-              ]}
-              onPress={handlePrimaryControl}
-              disabled={isEditMode}
-              activeOpacity={0.8}
-            >
-              <Text
-                style={[
-                  styles.controlButtonText,
-                  {
-                    fontSize: is2x2 ? 14 : is1x1 || size === "1x2" ? 12 : 12,
-                  },
-                ]}
-              >
-                {getPrimaryControlLabel()}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Change Subject Button - Show when timer is running/paused */}
-            {!isPreview && (isRunning || isPaused) && currentSubject && (
-              <TouchableOpacity
-                style={[
-                  styles.changeSubjectButton,
-                  {
-                    backgroundColor: `${accentColor}15`,
-                    borderColor: accentColor,
-                    paddingHorizontal: is1x1 || size === "1x2" ? 10 : 14,
-                    borderRadius: is1x1 || size === "1x2" ? 10 : 20,
-                  },
-                ]}
-                onPress={() => setShowChangeSubjectModal(true)}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={currentSubject.icon}
-                  size={is1x1 || size === "1x2" ? 16 : 16}
-                  color={accentColor}
-                />
-                {(size === "2x2" || size === "2x1") && (
-                  <>
-                    <Text
-                      style={[styles.changeSubjectText, { color: accentColor }]}
-                      numberOfLines={1}
-                    >
-                      {currentSubject.name}
-                    </Text>
-                    <Ionicons
-                      name="chevron-down"
-                      size={14}
-                      color={accentColor}
-                    />
-                  </>
-                )}
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
+        {renderSimplifiedContent()}
+      </View>
 
       {/* Subject Selection Modal - First Start */}
       {!isPreview && showSubjectModal && (
@@ -386,7 +574,6 @@ export default function TimerWidget({
           transparent
           animationType="fade"
           onRequestClose={() => {
-            // Use default subject if closed without selection
             const defaultSubject =
               subjects.find((s) => s.id === "general") || subjects[0];
             if (defaultSubject) {
@@ -398,7 +585,6 @@ export default function TimerWidget({
             style={styles.modalOverlay}
             activeOpacity={1}
             onPress={() => {
-              // Use default subject if tapped outside
               const defaultSubject =
                 subjects.find((s) => s.id === "general") || subjects[0];
               if (defaultSubject) {
@@ -586,63 +772,13 @@ export default function TimerWidget({
   );
 }
 
-// Animated Bead Component
-interface BeadProps {
-  isActive: boolean;
-  size: number;
-  activeColor: string;
-  inactiveColor: string;
-}
-
-function Bead({ isActive, size, activeColor, inactiveColor }: BeadProps) {
-  const scale = useSharedValue(isActive ? 1 : 1);
-  const opacity = useSharedValue(isActive ? 1 : 0.3);
-
-  useEffect(() => {
-    if (isActive) {
-      // Subtle pop animation when becoming active
-      scale.value = withSequence(
-        withTiming(1.3, { duration: 200, easing: Easing.out(Easing.ease) }),
-        withTiming(1, { duration: 200, easing: Easing.out(Easing.ease) })
-      );
-      opacity.value = withTiming(1, { duration: 300 });
-    } else {
-      scale.value = withTiming(1, { duration: 200 });
-      opacity.value = withTiming(0.3, { duration: 300 });
-    }
-  }, [isActive]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
-  }));
-
-  return (
-    <Animated.View
-      style={[
-        styles.bead,
-        {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: isActive ? activeColor : inactiveColor,
-        },
-        animatedStyle,
-      ]}
-    />
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     borderRadius: 16,
+    borderWidth: 1,
     padding: 16,
-    justifyContent: "space-between",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    overflow: "hidden",
+    justifyContent: "flex-start",
     position: "relative",
   },
   titleContainer: {
@@ -665,89 +801,165 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: "uppercase",
   },
-  topSection: {
-    alignItems: "center",
-    justifyContent: "center",
+
+  // Outlined button style
+  outlinedButton: {
+    borderWidth: 1.5,
+    backgroundColor: 'transparent',
   },
-  timeText: {
-    fontWeight: "700",
-    fontVariant: ["tabular-nums"],
-    fontFamily: Platform.select({
-      ios: "Courier New",
-      default: "monospace",
-    }),
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: "500",
-    marginTop: 4,
-    letterSpacing: 0.5,
-  },
-  bottomSection: {
-    alignItems: "center",
-    justifyContent: "flex-end",
-  },
-  hourIndicator: {
-    fontSize: 9,
-    fontWeight: "600",
-    letterSpacing: 1,
-    marginTop: 4,
-    marginBottom: 4,
-  },
-  statusTextAboveButtons: {
-    fontSize: 11,
-    fontWeight: "500",
-    letterSpacing: 0.5,
-    marginTop: 4,
-    marginBottom: 6,
-  },
-  beadsContainer: {
-    marginBottom: 8,
+
+  // New 1x1 Layout - Simple stacked design
+  grid1x1New: {
+    flex: 1,
+    justifyContent: 'space-between',
     gap: 8,
   },
-  beadsRow: {
-    flexDirection: "row",
-    gap: 10,
-    justifyContent: "center",
+  timerSection: {
+    flex: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  bead: {
-    // Dynamic styles applied in component
+  timerValue: {
+    fontSize: 28,
+    fontWeight: '400',
+    letterSpacing: -1,
   },
-  controlsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-  },
-  controlButton: {
-    height: 40,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-  },
-  controlButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-    letterSpacing: -0.2,
-  },
-  changeSubjectButton: {
-    height: 40,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    borderWidth: 1,
+  statusBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
     gap: 6,
   },
-  changeSubjectText: {
-    fontSize: 12,
-    fontWeight: "600",
-    flex: 1,
-    textAlign: "center",
+  statusText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
+  buttonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flex: 1,
+    marginBottom: 10,
+  },
+  actionButton: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    minHeight: 44,
+    backgroundColor: 'transparent',
+  },
+  buttonText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  statusDot1x1: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+
+  // Old 1x1 Grid (keeping for compatibility, but not used)
+  grid1x1: {
+    flex: 1,
+    gap: 8,
+  },
+  gridItem1x1: {
+    flex: 1,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    minHeight: 0,
+  },
+  gridLabel1x1: {
+    fontSize: 8,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  gridValue1x1: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: -0.3,
+  },
+
+  // 2x1 Row layout
+  row2x1: {
+    flex: 1,
+    flexDirection: "row",
+    gap: 10,
+  },
+  box2x1: {
+    flex: 1,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    minHeight: 0,
+  },
+
+  // 1x2 Column layout
+  column1x2: {
+    flex: 1,
+    gap: 12,
+  },
+  box1x2: {
+    flex: 1,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+
+  // 2x2 Grid layout - proper 2x2 using nested flex
+  grid2x2: {
+    flex: 1,
+    gap: 12,
+  },
+  box2x2: {
+    flex: 1,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    minHeight: 0,
+  },
+  row2x2: {
+    flex: 1,
+    flexDirection: "row",
+    gap: 12,
+  },
+  boxValue2x2: {
+    fontSize: 18,
+    fontWeight: "700",
+    letterSpacing: -0.5,
+  },
+
+  // Shared box styles
+  boxLabel: {
+    fontSize: 10,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  boxValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: -0.3,
+  },
+  statusDotLarge: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+
+  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",

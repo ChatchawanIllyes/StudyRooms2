@@ -232,7 +232,7 @@ export default function StatsHeatmapWidget({
             width: squareSize,
             height: squareSize,
             backgroundColor: color,
-            borderRadius: 2,
+            borderRadius: 3,
           },
         ]}
       />
@@ -241,7 +241,7 @@ export default function StatsHeatmapWidget({
 
   // 1x1 Layout: Current month horizontal rows (7 days per row)
   const render1x1 = () => {
-    const squareSize = 9;
+    const squareSize = 12;
     const allDays = weeks.flat().filter((d) => d !== null) as Date[];
     const rows: Date[][] = [];
     for (let i = 0; i < allDays.length; i += 7) {
@@ -268,7 +268,7 @@ export default function StatsHeatmapWidget({
 
   // 2x1 Layout: Past 6 months GitHub-style (horizontal)
   const render2x1 = () => {
-    const squareSize = 7; // Larger squares for 2x1
+    const squareSize = 9; // Larger squares for 2x1
 
     return (
       <View style={styles.container2x1}>
@@ -282,7 +282,7 @@ export default function StatsHeatmapWidget({
                   styles.monthLabel2x1,
                   {
                     color: colors.textSecondary,
-                    left: label.colIndex * (squareSize + 2),
+                    left: label.colIndex * (squareSize + 3),
                   },
                 ]}
               >
@@ -313,7 +313,7 @@ export default function StatsHeatmapWidget({
 
   // 1x2 Layout: 3 months stacked vertically
   const render1x2 = () => {
-    const squareSize = 8; // Larger squares for fewer months
+    const squareSize = 10; // Larger squares for fewer months
 
     return (
       <View style={styles.container1x2}>
@@ -328,7 +328,7 @@ export default function StatsHeatmapWidget({
                     styles.monthLabel1x2,
                     {
                       color: colors.textSecondary,
-                      left: label.colIndex * (squareSize + 2),
+                      left: label.colIndex * (squareSize + 3),
                     },
                   ]}
                 >
@@ -364,7 +364,7 @@ export default function StatsHeatmapWidget({
                     styles.monthLabel1x2,
                     {
                       color: colors.textSecondary,
-                      left: label.colIndex * (squareSize + 2),
+                      left: label.colIndex * (squareSize + 3),
                     },
                   ]}
                 >
@@ -400,7 +400,7 @@ export default function StatsHeatmapWidget({
                     styles.monthLabel1x2,
                     {
                       color: colors.textSecondary,
-                      left: label.colIndex * (squareSize + 2),
+                      left: label.colIndex * (squareSize + 3),
                     },
                   ]}
                 >
@@ -430,7 +430,7 @@ export default function StatsHeatmapWidget({
 
   // 2x2 Layout: Past 12 months vertical (stacked 6+6 months)
   const render2x2 = () => {
-    const squareSize = 7; // Larger squares for 2x2
+    const squareSize = 9; // Larger squares for 2x2
 
     return (
       <View style={styles.container2x2}>
@@ -445,7 +445,7 @@ export default function StatsHeatmapWidget({
                     styles.monthLabel2x2,
                     {
                       color: colors.textSecondary,
-                      left: label.colIndex * (squareSize + 2),
+                      left: label.colIndex * (squareSize + 3),
                     },
                   ]}
                 >
@@ -481,7 +481,7 @@ export default function StatsHeatmapWidget({
                     styles.monthLabel2x2,
                     {
                       color: colors.textSecondary,
-                      left: label.colIndex * (squareSize + 2),
+                      left: label.colIndex * (squareSize + 3),
                     },
                   ]}
                 >
@@ -520,9 +520,27 @@ export default function StatsHeatmapWidget({
           backgroundColor: colors.background,
           borderColor: colors.border,
           opacity: isEditMode ? 0.6 : 1,
+          overflow: isPreview ? "visible" : "hidden",
         },
       ]}
     >
+      {isPreview && (
+        <View
+          style={[
+            styles.titleContainer,
+            {
+              backgroundColor: accentColor,
+              borderWidth: 2,
+              borderColor: colors.background,
+            },
+          ]}
+        >
+          <Text style={[styles.widgetTitle, { color: "#FFFFFF" }]}>
+            Heatmap
+          </Text>
+        </View>
+      )}
+
       {size === "1x1" && render1x1()}
       {size === "2x1" && render2x1()}
       {size === "1x2" && render1x2()}
@@ -536,8 +554,29 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 16,
     borderWidth: 1,
-    padding: 12,
+    padding: 16,
     overflow: "hidden",
+    position: "relative",
+  },
+  titleContainer: {
+    position: "absolute",
+    top: -14,
+    alignSelf: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 14,
+    zIndex: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  widgetTitle: {
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
   },
 
   // 1x1 Layout
@@ -547,11 +586,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   monthLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "700",
     textTransform: "uppercase",
-    marginBottom: 8,
-    letterSpacing: 2,
+    marginBottom: 10,
+    letterSpacing: 2.5,
   },
 
   // 2x1 Layout
@@ -561,10 +600,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   monthLabel2x1: {
-    fontSize: 7,
-    fontWeight: "600",
+    fontSize: 9,
+    fontWeight: "700",
     textTransform: "uppercase",
     position: "absolute",
+    letterSpacing: 1,
   },
 
   // 1x2 Layout
@@ -579,10 +619,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   monthLabel1x2: {
-    fontSize: 8,
-    fontWeight: "600",
+    fontSize: 9,
+    fontWeight: "700",
     textTransform: "uppercase",
     position: "absolute",
+    letterSpacing: 1,
   },
 
   // 2x2 Layout
@@ -593,15 +634,16 @@ const styles = StyleSheet.create({
   },
   monthLabelsRow: {
     flexDirection: "row",
-    height: 10,
-    marginBottom: 4,
+    height: 12,
+    marginBottom: 6,
     position: "relative",
   },
   monthLabel2x2: {
-    fontSize: 7,
-    fontWeight: "600",
+    fontSize: 9,
+    fontWeight: "700",
     textTransform: "uppercase",
     position: "absolute",
+    letterSpacing: 1,
   },
 
   // Wrapper for month labels + grid alignment
@@ -611,24 +653,24 @@ const styles = StyleSheet.create({
 
   // Horizontal grid styles for 1x1
   horizontalGrid: {
-    gap: 3,
+    gap: 4,
     alignItems: "center",
   },
   horizontalRow: {
     flexDirection: "row",
-    gap: 3,
+    gap: 4,
   },
   githubGrid: {
-    gap: 2,
+    gap: 3,
     justifyContent: "center",
   },
   githubRow: {
     flexDirection: "row",
-    gap: 2,
+    gap: 3,
   },
 
   // Common
   daySquare: {
-    borderRadius: 2,
+    borderRadius: 3,
   },
 });

@@ -27,6 +27,7 @@ const WIDGET_INFO: Record<WidgetType, { name: string; icon: any }> = {
   timer: { name: "Timer", icon: "timer-outline" },
   tasks: { name: "Tasks", icon: "checkbox-outline" },
   stats: { name: "Stats", icon: "bar-chart-outline" },
+  "stats-heatmap": { name: "Heatmap", icon: "grid-outline" },
 };
 
 export default function PlaceWidgetScreen() {
@@ -82,52 +83,60 @@ export default function PlaceWidgetScreen() {
     const isOccupied = occupiedPositions.has(position);
     const isSelected = selectedPosition === position;
     const isAvailable = isSlotAvailableForSize(position);
-    const showPreview = isSelected && canConfirm();
+    const showPreview = isSelected;
 
     return (
-      <TouchableOpacity
-        key={position}
-        disabled={isOccupied}
-        onPress={() => {
-          if (isSelected && canConfirm()) {
-            // Tapping selected slot with valid config confirms placement
-            handleConfirm();
-          } else {
-            setSelectedPosition(position);
-          }
-        }}
-        style={[
-          styles.previewSlot,
-          {
-            width: PREVIEW_SLOT_SIZE,
-            height: PREVIEW_SLOT_SIZE,
-            borderColor: isSelected ? accentColor : colors.border,
-            backgroundColor: isOccupied ? colors.card : colors.background,
-            opacity: isOccupied ? 0.3 : 1,
-          },
-          isSelected && { borderWidth: 2.5 },
-        ]}
-      >
-        {/* Show actual widget preview when selected and valid */}
-        {showPreview ? (
-          <View style={styles.widgetPreviewContainer}>
-            <WidgetTile
-              type={widgetType}
-              size={selectedSize}
-              isPreview={true}
-            />
-            {/* Checkmark overlay on top-right of widget preview */}
-            <View
-              style={[
-                styles.slotCheckmark,
-                { backgroundColor: accentColor }
-              ]}
-            >
-              <Ionicons name="checkmark" size={20} color="#fff" />
+      <View style={{ position: "relative", overflow: "visible" }}>
+        <TouchableOpacity
+          key={position}
+          disabled={isOccupied}
+          onPress={() => {
+            if (isSelected) {
+              // Tapping selected slot confirms placement
+              handleConfirm();
+            } else {
+              setSelectedPosition(position);
+            }
+          }}
+          style={[
+            styles.previewSlot,
+            {
+              width: PREVIEW_SLOT_SIZE,
+              height: PREVIEW_SLOT_SIZE,
+              borderColor: isSelected ? accentColor : colors.border,
+              backgroundColor: isOccupied ? colors.card : colors.background,
+              opacity: isOccupied ? 0.3 : 1,
+            },
+            isSelected && { borderWidth: 2.5 },
+          ]}
+        >
+          {/* Show actual widget preview when selected */}
+          {showPreview && (
+            <View style={styles.widgetPreviewContainer}>
+              <WidgetTile
+                type={widgetType}
+                size="1x1"
+                isPreview={true}
+              />
             </View>
+          )}
+        </TouchableOpacity>
+
+        {/* Checkmark overlay - COMPLETELY OUTSIDE TouchableOpacity */}
+        {showPreview && (
+          <View
+            style={[
+              styles.slotCheckmark,
+              {
+                backgroundColor: "#007AFF", // Bright blue for visibility
+              }
+            ]}
+            pointerEvents="none"
+          >
+            <Ionicons name="checkmark" size={24} color="#fff" />
           </View>
-        ) : null}
-      </TouchableOpacity>
+        )}
+      </View>
     );
   };
 
@@ -165,88 +174,43 @@ export default function PlaceWidgetScreen() {
           >
             <Ionicons name="chevron-back" size={28} color={accentColor} />
           </TouchableOpacity>
-          <Text style={[styles.title, { color: colors.text }]}>Place Widget</Text>
+          <Text style={[styles.title, { color: colors.text }]}>
+            Place Widget
+          </Text>
           <View style={styles.placeholder} />
         </View>
 
-        <ScrollView 
+        <ScrollView
           style={styles.content}
           contentContainerStyle={styles.contentContainer}
           showsVerticalScrollIndicator={false}
         >
-        {/* Widget Info */}
-        <View style={[styles.widgetInfoCard, { backgroundColor: colors.card }]}>
-          <Ionicons name={widgetInfo.icon} size={32} color={accentColor} />
-          <Text style={[styles.widgetName, { color: colors.text }]}> 
-            {widgetInfo.name}
-          </Text>
-        </View>
-
-        {/* Step 1: Choose Position */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}> 
-            1. Choose Position
-          </Text>
-          <Text
-            style={[styles.sectionDescription, { color: colors.textSecondary }]}
+          {/* Widget Info */}
+          <View
+            style={[styles.widgetInfoCard, { backgroundColor: colors.card }]}
           >
-            Tap an empty slot on the grid
-          </Text>
-          <View style={styles.previewGrid}>{renderPreviewGrid()}</View>
-        </View>
-
-        {/* Step 2: Choose Size */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}> 
-            2. Choose Size
-          </Text>
-          <View style={styles.sizeOptions}>
-            {sizeOptions.map((option) => (
-              <TouchableOpacity
-                key={option.value}
-                onPress={() => setSelectedSize(option.value)}
-                style={[
-                  styles.sizeOption,
-                  {
-                    borderColor:
-                      selectedSize === option.value
-                        ? accentColor
-                        : colors.border,
-                    backgroundColor:
-                      selectedSize === option.value
-                        ? `${accentColor}15`
-                        : colors.background,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.sizeOptionText,
-                    {
-                      color:
-                        selectedSize === option.value
-                          ? accentColor
-                          : colors.text,
-                    },
-                  ]}
-                >
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Warning */}
-        {spaceWarning && (
-          <View style={[styles.warningBox, { backgroundColor: "#ff3b3015" }]}> 
-            <Ionicons name="warning-outline" size={20} color="#ff3b30" />
-            <Text style={[styles.warningText, { color: "#ff3b30" }]}> 
-              {spaceWarning}
+            <Ionicons name={widgetInfo.icon} size={32} color={accentColor} />
+            <Text style={[styles.widgetName, { color: colors.text }]}>
+              {widgetInfo.name}
             </Text>
           </View>
-        )}
-      </ScrollView>
+
+          {/* Choose Position */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Choose Position
+            </Text>
+            <Text
+              style={[
+                styles.sectionDescription,
+                { color: colors.textSecondary },
+              ]}
+            >
+              Tap to place your widget, then tap again to confirm
+            </Text>
+            <View style={styles.previewGrid}>{renderPreviewGrid()}</View>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -300,6 +264,7 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 24,
+    overflow: "visible",
   },
   sectionTitle: {
     fontSize: 17,
@@ -314,10 +279,12 @@ const styles = StyleSheet.create({
   },
   previewGrid: {
     gap: GAP,
+    overflow: "visible",
   },
   previewRow: {
     flexDirection: "row",
     gap: GAP,
+    overflow: "visible",
   },
   previewSlot: {
     borderWidth: 1.5,
@@ -330,25 +297,29 @@ const styles = StyleSheet.create({
   widgetPreviewContainer: {
     width: "100%",
     height: "100%",
-    position: "relative",
+    position: "absolute",
+    top: 0,
+    left: 0,
+    borderRadius: 12,
+    overflow: "hidden",
   },
   slotCheckmark: {
     position: "absolute",
-    top: -8,
-    right: -8,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    top: -10,
+    right: -10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-    borderWidth: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 10,
+    borderWidth: 3,
     borderColor: "#fff",
-    zIndex: 100,
+    zIndex: 1000,
   },
   sizeOptions: {
     flexDirection: "row",

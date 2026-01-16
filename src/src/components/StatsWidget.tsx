@@ -11,12 +11,7 @@ import { useTheme } from "../context/ThemeContext";
 import { WidgetSize } from "../context/WidgetContext";
 import * as StorageService from "../services/storage";
 import { StudySession, Subject } from "../types";
-import Svg, {
-  Polygon,
-  Line,
-  Circle,
-  Text as SvgText,
-} from "react-native-svg";
+import Svg, { Polygon, Line, Circle, Text as SvgText } from "react-native-svg";
 
 interface StatsWidgetProps {
   size: WidgetSize;
@@ -86,12 +81,42 @@ export default function StatsWidget({
     // Helper function to generate hardcoded/dummy data
     const generateDummyData = () => {
       const dummySubjects: Subject[] = [
-        { id: "math", name: "Math", icon: "calculator-outline", color: accentColor },
-        { id: "science", name: "Science", icon: "flask-outline", color: accentColor },
-        { id: "history", name: "History", icon: "book-outline", color: accentColor },
-        { id: "english", name: "English", icon: "create-outline", color: accentColor },
-        { id: "art", name: "Art", icon: "color-palette-outline", color: accentColor },
-        { id: "music", name: "Music", icon: "musical-notes-outline", color: accentColor },
+        {
+          id: "math",
+          name: "Math",
+          icon: "calculator-outline",
+          color: accentColor,
+        },
+        {
+          id: "science",
+          name: "Science",
+          icon: "flask-outline",
+          color: accentColor,
+        },
+        {
+          id: "history",
+          name: "History",
+          icon: "book-outline",
+          color: accentColor,
+        },
+        {
+          id: "english",
+          name: "English",
+          icon: "create-outline",
+          color: accentColor,
+        },
+        {
+          id: "art",
+          name: "Art",
+          icon: "color-palette-outline",
+          color: accentColor,
+        },
+        {
+          id: "music",
+          name: "Music",
+          icon: "musical-notes-outline",
+          color: accentColor,
+        },
       ];
       const dummyMinutes = [120, 110, 100, 95, 85, 80];
       const maxMinutes = Math.max(...dummyMinutes, 120);
@@ -210,10 +235,21 @@ export default function StatsWidget({
     // Safety check - should never happen now, but just in case
     if (dataPoints.length === 0) {
       return (
-        <View style={[styles.radarContainer, { width: chartSize, height: chartSize }]}>
+        <View
+          style={[
+            styles.radarContainer,
+            { width: chartSize, height: chartSize },
+          ]}
+        >
           <View style={styles.placeholderRadar}>
-            <Ionicons name="stats-chart" size={chartSize * 0.3} color={colors.border} />
-            <Text style={[styles.placeholderText, { color: colors.textSecondary }]}>
+            <Ionicons
+              name="stats-chart"
+              size={chartSize * 0.3}
+              color={colors.border}
+            />
+            <Text
+              style={[styles.placeholderText, { color: colors.textSecondary }]}
+            >
               No data yet
             </Text>
           </View>
@@ -222,7 +258,9 @@ export default function StatsWidget({
     }
 
     return (
-      <View style={[styles.radarContainer, { width: chartSize, height: chartSize }]}>
+      <View
+        style={[styles.radarContainer, { width: chartSize, height: chartSize }]}
+      >
         <Svg width={chartSize} height={chartSize}>
           {/* Grid circles (3 levels) - subtle and clean */}
           {[0.33, 0.66, 1].map((scale, i) => (
@@ -299,9 +337,10 @@ export default function StatsWidget({
 
               // Truncate text more aggressively for 2x2 to prevent cutoff
               const maxLength = is2x2 ? 6 : 8;
-              const displayText = point.subject?.name?.length > maxLength
-                ? point.subject.name.substring(0, maxLength - 1) + "."
-                : (point.subject?.name || "");
+              const displayText =
+                point.subject?.name?.length > maxLength
+                  ? point.subject.name.substring(0, maxLength - 1) + "."
+                  : point.subject?.name || "";
 
               return (
                 <SvgText
@@ -329,40 +368,41 @@ export default function StatsWidget({
 
     return (
       <View style={styles.legend}>
-        {radarData.dataPoints.slice(0, is1x1 ? 2 : is2x1 ? 3 : 6).map((point, index) => (
-          <View key={point.subject?.id || `subject-${index}`} style={styles.legendItem}>
+        {radarData.dataPoints
+          .slice(0, is1x1 ? 2 : is2x1 ? 3 : 6)
+          .map((point, index) => (
             <View
-              style={[
-                styles.legendDot,
-                { backgroundColor: accentColor },
-              ]}
-            />
-            <Text
-              style={[
-                styles.legendText,
-                { color: colors.text, fontSize: is1x1 ? 9 : 11 },
-              ]}
-              numberOfLines={1}
+              key={point.subject?.id || `subject-${index}`}
+              style={styles.legendItem}
             >
-              {point.subject?.name || "Unknown"}
-            </Text>
-            <Text
-              style={[
-                styles.legendValue,
-                {
-                  color: accentColor,
-                  fontSize: is1x1 ? 9 : 11,
-                },
-              ]}
-            >
-              {formatTime(point.minutes)}
-            </Text>
-          </View>
-        ))}
+              <View
+                style={[styles.legendDot, { backgroundColor: accentColor }]}
+              />
+              <Text
+                style={[
+                  styles.legendText,
+                  { color: colors.text, fontSize: is1x1 ? 9 : 11 },
+                ]}
+                numberOfLines={1}
+              >
+                {point.subject?.name || "Unknown"}
+              </Text>
+              <Text
+                style={[
+                  styles.legendValue,
+                  {
+                    color: accentColor,
+                    fontSize: is1x1 ? 9 : 11,
+                  },
+                ]}
+              >
+                {formatTime(point.minutes)}
+              </Text>
+            </View>
+          ))}
       </View>
     );
   };
-
 
   // Layout variants based on size
   if (is1x1) {
@@ -441,7 +481,9 @@ export default function StatsWidget({
             {renderRadarChart(dimensions.height - 32, true)}
           </View>
           <View style={styles.legendSection}>
-            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+            <Text
+              style={[styles.sectionTitle, { color: colors.textSecondary }]}
+            >
               Last 7 Days
             </Text>
             {renderLegend()}
@@ -499,8 +541,20 @@ export default function StatsWidget({
     <TouchableOpacity
       style={[
         styles.container,
-        { backgroundColor: 'transparent', borderColor: 'transparent', shadowColor: 'transparent', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
-        { width: dimensions.width, height: dimensions.height, overflow: isPreview ? "visible" : "hidden" },
+        {
+          backgroundColor: "transparent",
+          borderColor: "transparent",
+          shadowColor: "transparent",
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0,
+          shadowRadius: 0,
+          elevation: 0,
+        },
+        {
+          width: dimensions.width,
+          height: dimensions.height,
+          overflow: isPreview ? "visible" : "hidden",
+        },
       ]}
       onPress={handlePress}
       disabled={isEditMode || isPreview}
@@ -531,11 +585,12 @@ export default function StatsWidget({
           </Text>
         </View>
 
-        {renderRadarChart(Math.min(dimensions.width, dimensions.height) - 80, true)}
+        {renderRadarChart(
+          Math.min(dimensions.width, dimensions.height) - 80,
+          true
+        )}
 
-        <View style={styles.legendGrid}>
-          {renderLegend()}
-        </View>
+        <View style={styles.legendGrid}>{renderLegend()}</View>
       </View>
     </TouchableOpacity>
   );

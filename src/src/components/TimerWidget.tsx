@@ -131,7 +131,6 @@ export default function TimerWidget({
 
   const statusInfo = getStatusInfo();
 
-
   // Simplified balanced layout for all sizes
   const renderSimplifiedContent = () => {
     if (is1x1) {
@@ -153,13 +152,13 @@ export default function TimerWidget({
           {/* Status Bar - Thin in middle */}
           <View style={styles.statusBar}>
             <View
-              style={[styles.statusDot1x1, { backgroundColor: statusInfo.color }]}
+              style={[
+                styles.statusDot1x1,
+                { backgroundColor: statusInfo.color },
+              ]}
             />
             <Text
-              style={[
-                styles.statusText,
-                { color: statusInfo.color },
-              ]}
+              style={[styles.statusText, { color: statusInfo.color }]}
               numberOfLines={1}
             >
               {statusInfo.text}
@@ -193,9 +192,14 @@ export default function TimerWidget({
               style={[
                 styles.actionButton,
                 {
-                  borderColor: !isPreview && currentSubject
-                    ? (isEditMode ? `${currentSubject.color}40` : currentSubject.color)
-                    : (isEditMode ? `${colors.border}40` : colors.border),
+                  borderColor:
+                    !isPreview && currentSubject
+                      ? isEditMode
+                        ? `${currentSubject.color}40`
+                        : currentSubject.color
+                      : isEditMode
+                      ? `${colors.border}40`
+                      : colors.border,
                   opacity: isEditMode ? 0.4 : 1,
                 },
               ]}
@@ -237,7 +241,9 @@ export default function TimerWidget({
             <Text style={[styles.boxLabel, { color: colors.textSecondary }]}>
               Time
             </Text>
-            <Text style={[styles.boxValue, { color: colors.text, fontSize: 15 }]}>
+            <Text
+              style={[styles.boxValue, { color: colors.text, fontSize: 15 }]}
+            >
               {formatTime(displayElapsedMs)}
             </Text>
           </TouchableOpacity>
@@ -250,12 +256,20 @@ export default function TimerWidget({
             activeOpacity={0.7}
           >
             <View
-              style={[styles.statusDotLarge, { backgroundColor: statusInfo.color }]}
+              style={[
+                styles.statusDotLarge,
+                { backgroundColor: statusInfo.color },
+              ]}
             />
             <Text style={[styles.boxLabel, { color: colors.textSecondary }]}>
               Status
             </Text>
-            <Text style={[styles.boxValue, { color: statusInfo.color, fontSize: 13 }]}>
+            <Text
+              style={[
+                styles.boxValue,
+                { color: statusInfo.color, fontSize: 13 },
+              ]}
+            >
               {statusInfo.text}
             </Text>
           </TouchableOpacity>
@@ -287,7 +301,10 @@ export default function TimerWidget({
               style={[
                 styles.boxValue,
                 {
-                  color: !isPreview && currentSubject ? currentSubject.color : colors.textSecondary,
+                  color:
+                    !isPreview && currentSubject
+                      ? currentSubject.color
+                      : colors.textSecondary,
                   fontSize: 11,
                 },
               ]}
@@ -313,7 +330,9 @@ export default function TimerWidget({
           >
             <Ionicons
               name={
-                !isRunning && !isPaused && elapsedMs === 0 ? "play-circle" : "stop-circle"
+                !isRunning && !isPaused && elapsedMs === 0
+                  ? "play-circle"
+                  : "stop-circle"
               }
               size={32}
               color={accentColor}
@@ -338,7 +357,9 @@ export default function TimerWidget({
             <Text style={[styles.boxLabel, { color: colors.textSecondary }]}>
               Time
             </Text>
-            <Text style={[styles.boxValue, { color: colors.text, fontSize: 18 }]}>
+            <Text
+              style={[styles.boxValue, { color: colors.text, fontSize: 18 }]}
+            >
               {formatTime(displayElapsedMs)}
             </Text>
           </TouchableOpacity>
@@ -351,7 +372,10 @@ export default function TimerWidget({
             activeOpacity={0.7}
           >
             <View
-              style={[styles.statusDotLarge, { backgroundColor: statusInfo.color }]}
+              style={[
+                styles.statusDotLarge,
+                { backgroundColor: statusInfo.color },
+              ]}
             />
             <Text style={[styles.boxLabel, { color: colors.textSecondary }]}>
               Status
@@ -388,7 +412,10 @@ export default function TimerWidget({
               style={[
                 styles.boxValue,
                 {
-                  color: !isPreview && currentSubject ? currentSubject.color : colors.textSecondary,
+                  color:
+                    !isPreview && currentSubject
+                      ? currentSubject.color
+                      : colors.textSecondary,
                   fontSize: 12,
                 },
               ]}
@@ -414,7 +441,9 @@ export default function TimerWidget({
           >
             <Ionicons
               name={
-                !isRunning && !isPaused && elapsedMs === 0 ? "play-circle" : "stop-circle"
+                !isRunning && !isPaused && elapsedMs === 0
+                  ? "play-circle"
+                  : "stop-circle"
               }
               size={36}
               color={accentColor}
@@ -496,7 +525,10 @@ export default function TimerWidget({
               style={[
                 styles.boxValue2x2,
                 {
-                  color: !isPreview && currentSubject ? currentSubject.color : colors.textSecondary,
+                  color:
+                    !isPreview && currentSubject
+                      ? currentSubject.color
+                      : colors.textSecondary,
                   fontSize: 13,
                 },
               ]}
@@ -522,7 +554,9 @@ export default function TimerWidget({
           >
             <Ionicons
               name={
-                !isRunning && !isPaused && elapsedMs === 0 ? "play-circle" : "stop-circle"
+                !isRunning && !isPaused && elapsedMs === 0
+                  ? "play-circle"
+                  : "stop-circle"
               }
               size={40}
               color={accentColor}
@@ -805,38 +839,38 @@ const styles = StyleSheet.create({
   // Outlined button style
   outlinedButton: {
     borderWidth: 1.5,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
 
   // New 1x1 Layout - Simple stacked design
   grid1x1New: {
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
     gap: 8,
   },
   timerSection: {
     flex: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   timerValue: {
     fontSize: 28,
-    fontWeight: '400',
+    fontWeight: "400",
     letterSpacing: -1,
   },
   statusBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 8,
     gap: 6,
   },
   statusText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   buttonsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
     flex: 1,
     marginBottom: 10,
@@ -845,18 +879,18 @@ const styles = StyleSheet.create({
     flex: 1,
     borderWidth: 1.5,
     borderRadius: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 4,
     paddingVertical: 10,
     paddingHorizontal: 8,
     minHeight: 44,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   buttonText: {
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   statusDot1x1: {
     width: 6,

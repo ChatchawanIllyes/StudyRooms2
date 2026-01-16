@@ -263,7 +263,7 @@ export default function WidgetTile({
               {
                 width: dimensions.width,
                 height: dimensions.height,
-                backgroundColor: 'transparent',
+                backgroundColor: "transparent",
                 borderColor:
                   isEditMode || isInResizeMode ? accentColor : "transparent",
                 borderWidth: 2,
@@ -319,7 +319,7 @@ export default function WidgetTile({
           {
             width: dimensions.width,
             height: dimensions.height,
-            backgroundColor: 'transparent',
+            backgroundColor: "transparent",
             borderColor:
               isEditMode || isInResizeMode ? accentColor : "transparent",
             borderWidth: 2,
@@ -367,7 +367,10 @@ export default function WidgetTile({
         )}
 
         {/* Only wrap in GestureDetector when in edit mode */}
-        {isEditMode && !isInResizeMode && !isPreview && widgetId !== undefined ? (
+        {isEditMode &&
+        !isInResizeMode &&
+        !isPreview &&
+        widgetId !== undefined ? (
           <GestureDetector gesture={panGesture}>
             <Animated.View>{taskWidgetContent}</Animated.View>
           </GestureDetector>
@@ -508,7 +511,7 @@ export default function WidgetTile({
             {
               width: dimensions.width,
               height: dimensions.height,
-              backgroundColor: 'transparent',
+              backgroundColor: "transparent",
               borderColor:
                 isEditMode || isInResizeMode ? accentColor : "transparent",
               borderWidth: 2,
@@ -524,19 +527,25 @@ export default function WidgetTile({
                   backgroundColor: accentColor,
                   borderWidth: 2,
                   borderColor: colors.background,
-                  position: 'absolute',
+                  position: "absolute",
                   top: 8,
                   left: 8,
                   right: 8,
                   paddingVertical: 6,
                   paddingHorizontal: 12,
                   zIndex: 20,
-                  alignSelf: 'center',
-                  maxWidth: '90%',
+                  alignSelf: "center",
+                  maxWidth: "90%",
                 },
               ]}
             >
-              <Text style={styles.titleBadgeText} numberOfLines={1} ellipsizeMode="tail">{info.name}</Text>
+              <Text
+                style={styles.titleBadgeText}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {info.name}
+              </Text>
             </View>
           )}
 

@@ -385,6 +385,226 @@ export const clearAllData = async (): Promise<void> => {
   }
 };
 
+// ============ STATISTICS & INSIGHTS ============
+
+// Calculate current study streak (consecutive days with study time)
+export const calculateStreak = async (): Promise<number> => {
+  try {
+    const stats = await getDailyStats();
+    if (stats.length === 0) return 0;
+
+    // Sort by date descending
+    const sorted = stats
+      .filter((s) => s.totalMinutes > 0)
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    if (sorted.length === 0) return 0;
+
+    const today = new Date().toISOString().split("T")[0];
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+    // Check if streak is current (today or yesterday)
+    if (sorted[0].date !== today && sorted[0].date !== yesterdayStr) {
+      return 0;
+    }
+
+    let streak = 0;
+    let currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0);
+
+    // Count backwards from today
+    for (let i = 0; i < sorted.length; i++) {
+      const checkDate = new Date(currentDate);
+      checkDate.setDate(currentDate.getDate() - i);
+      const checkDateStr = checkDate.toISOString().split("T")[0];
+
+      const dayStats = sorted.find((s) => s.date === checkDateStr);
+      if (dayStats && dayStats.totalMinutes > 0) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  } catch (error) {
+    console.error("Error calculating streak:", error);
+    return 0;
+  }
+};
+
+// Calculate week-over-week trend percentage
+export const getWeekTrend = async (): Promise<number> => {
+  try {
+    const now = new Date();
+
+    // This week (last 7 days)
+    const thisWeekStart = new Date(now);
+    thisWeekStart.setDate(now.getDate() - 6);
+    const thisWeekStats = await getStatsForPeriod(thisWeekStart, now);
+    const thisWeekMinutes = thisWeekStats.reduce(
+      (sum, s) => sum + s.totalMinutes,
+      0
+    );
+
+    // Last week (days 7-13 ago)
+    const lastWeekEnd = new Date(now);
+    lastWeekEnd.setDate(now.getDate() - 7);
+    const lastWeekStart = new Date(now);
+    lastWeekStart.setDate(now.getDate() - 13);
+    const lastWeekStats = await getStatsForPeriod(lastWeekStart, lastWeekEnd);
+    const lastWeekMinutes = lastWeekStats.reduce(
+      (sum, s) => sum + s.totalMinutes,
+      0
+    );
+
+    if (lastWeekMinutes === 0) {
+      return thisWeekMinutes > 0 ? 100 : 0;
+    }
+
+    const trend = ((thisWeekMinutes - lastWeekMinutes) / lastWeekMinutes) * 100;
+    return Math.round(trend);
+  } catch (error) {
+    console.error("Error calculating week trend:", error);
+    return 0;
+  }
+};
+
+// Calculate average session duration in minutes
+export const getAverageSessionDuration = async (): Promise<number> => {
+  try {
+    const sessions = await getSessions();
+    if (sessions.length === 0) return 0;
+
+    const totalDuration = sessions.reduce((sum, s) => sum + s.duration, 0);
+    return Math.round(totalDuration / sessions.length / 60); // Convert to minutes
+  } catch (error) {
+    console.error("Error calculating average session duration:", error);
+    return 0;
+  }
+};
+
+// Get the hour of day when user is most productive
+export const getMostProductiveHour = async (): Promise<number> => {
+  try {
+    const sessions = await getSessions();
+    if (sessions.length === 0) return -1;
+
+    // Count study time by hour
+    const hourTotals: { [hour: number]: number } = {};
+
+    sessions.forEach((session) => {
+      const hour = new Date(session.date).getHours();
+      hourTotals[hour] = (hourTotals[hour] || 0) + session.duration;
+    });
+
+    // Find hour with most study time
+    let maxHour = -1;
+    let maxDuration = 0;
+
+    Object.entries(hourTotals).forEach(([hour, duration]) => {
+      if (duration > maxDuration) {
+        maxDuration = duration;
+        maxHour = parseInt(hour);
+      }
+    });
+
+    return maxHour;
+  } catch (error) {
+    console.error("Error calculating most productive hour:", error);
+    return -1;
+  }
+};
+
+// Get longest streak ever achieved
+export const getLongestStreak = async (): Promise<number> => {
+  try {
+    const stats = await getDailyStats();
+    if (stats.length === 0) return 0;
+
+    // Sort by date
+    const sorted = stats
+      .filter((s) => s.totalMinutes > 0)
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    if (sorted.length === 0) return 0;
+
+    let longestStreak = 0;
+    let currentStreak = 1;
+    let previousDate = new Date(sorted[0].date);
+
+    for (let i = 1; i < sorted.length; i++) {
+      const currentDate = new Date(sorted[i].date);
+      const dayDiff = Math.round(
+        (currentDate.getTime() - previousDate.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      if (dayDiff === 1) {
+        currentStreak++;
+      } else {
+        longestStreak = Math.max(longestStreak, currentStreak);
+        currentStreak = 1;
+      }
+
+      previousDate = currentDate;
+    }
+
+    longestStreak = Math.max(longestStreak, currentStreak);
+    return longestStreak;
+  } catch (error) {
+    console.error("Error calculating longest streak:", error);
+    return 0;
+  }
+};
+
+// Get sessions with more detailed info for display
+export const getRecentSessionsWithDetails = async (
+  limit: number = 5
+): Promise<
+  Array<{
+    session: StudySession;
+    subject: Subject | null;
+    timeAgo: string;
+  }>
+> => {
+  try {
+    const sessions = await getRecentSessions(limit);
+    const subjects = await getSubjects();
+
+    return sessions.map((session) => {
+      const subject = subjects.find((s) => s.id === session.subjectId) || null;
+      const timeAgo = getTimeAgo(new Date(session.date));
+      return { session, subject, timeAgo };
+    });
+  } catch (error) {
+    console.error("Error getting recent sessions with details:", error);
+    return [];
+  }
+};
+
+// Helper to format "time ago" strings
+const getTimeAgo = (date: Date): string => {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMins < 60) {
+    return `${diffMins}m ago`;
+  } else if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  } else if (diffDays === 1) {
+    return "Yesterday";
+  } else if (diffDays < 7) {
+    return `${diffDays}d ago`;
+  } else {
+    return date.toLocaleDateString();
+  }
+};
+
 // ============ DUMMY DATA FOR TESTING ============
 export const addDummyStudySessions = async (): Promise<number> => {
   try {

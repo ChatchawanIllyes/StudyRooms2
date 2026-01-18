@@ -225,7 +225,7 @@ export default function StatsWidget({
   };
 
   const renderRadarChart = (chartSize: number, showLabels: boolean = true) => {
-    const padding = showLabels ? (is2x2 ? 40 : 30) : 10;
+    const padding = showLabels ? (is2x2 ? 45 : 30) : 10;
     const center = chartSize / 2;
     const maxRadius = center - padding;
 
@@ -326,7 +326,7 @@ export default function StatsWidget({
           {showLabels &&
             dataPoints.map((point, index) => {
               const angle = (index / numPoints) * 2 * Math.PI - Math.PI / 2;
-              const labelDistance = maxRadius + (is2x2 ? 25 : 20);
+              const labelDistance = maxRadius + (is2x2 ? 30 : 20);
               const x = center + labelDistance * Math.cos(angle);
               const y = center + labelDistance * Math.sin(angle);
 
@@ -335,12 +335,13 @@ export default function StatsWidget({
               if (x > center + 5) textAnchor = "start";
               else if (x < center - 5) textAnchor = "end";
 
-              // Truncate text more aggressively for 2x2 to prevent cutoff
-              const maxLength = is2x2 ? 6 : 8;
-              const displayText =
-                point.subject?.name?.length > maxLength
-                  ? point.subject.name.substring(0, maxLength - 1) + "."
-                  : point.subject?.name || "";
+              // For 2x2: show full text with smaller font size (no truncation)
+              // For other sizes: truncate to 8 characters
+              const displayText = is2x2
+                ? point.subject?.name || ""
+                : point.subject?.name?.length > 8
+                ? point.subject.name.substring(0, 7) + "."
+                : point.subject?.name || "";
 
               return (
                 <SvgText
@@ -348,7 +349,7 @@ export default function StatsWidget({
                   x={x}
                   y={y}
                   fill={colors.text}
-                  fontSize={is1x1 ? 8 : is2x2 ? 9 : 9}
+                  fontSize={is1x1 ? 8 : is2x2 ? 8 : 9}
                   fontWeight="600"
                   textAnchor={textAnchor}
                   opacity={0.8}
@@ -542,17 +543,10 @@ export default function StatsWidget({
       style={[
         styles.container,
         {
-          backgroundColor: "transparent",
-          borderColor: "transparent",
-          shadowColor: "transparent",
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0,
-          shadowRadius: 0,
-          elevation: 0,
-        },
-        {
           width: dimensions.width,
           height: dimensions.height,
+          backgroundColor: colors.background,
+          borderColor: colors.border,
           overflow: isPreview ? "visible" : "hidden",
         },
       ]}

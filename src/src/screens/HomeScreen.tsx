@@ -217,8 +217,15 @@ export default function HomeScreen() {
       timer: "Timer",
       tasks: "Tasks",
       stats: "Stats",
+      "stats-heatmap": "Stats", // Navigate to Stats screen
     };
-    navigation.navigate(screenMap[type]);
+
+    // For stats-heatmap, navigate to Stats screen with calendar tab
+    if (type === "stats-heatmap") {
+      navigation.navigate("Stats", { tab: "calendar" });
+    } else {
+      navigation.navigate(screenMap[type]);
+    }
   };
 
   const handleRemoveWidget = (id: string) => {

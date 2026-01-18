@@ -1,113 +1,172 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 import { useFocusEffect } from "@react-navigation/native";
 import * as StorageService from "../services/storage";
-import { DailyStats } from "../types";
+import { DailyStats, StudySession, Subject } from "../types";
+import CalendarView from "../components/CalendarView";
+import DayDetailSheet from "../components/DayDetailSheet";
+
+// Import new stats components
+import PeriodSelector, { Period } from "../components/stats/PeriodSelector";
+import DailyProgressRing from "../components/stats/DailyProgressRing";
+import QuickStatsRow from "../components/stats/QuickStatsRow";
+import FocusTimeChart from "../components/stats/FocusTimeChart";
+import SubjectBreakdown from "../components/stats/SubjectBreakdown";
+import RecentSessionsList from "../components/stats/RecentSessionsList";
+import InsightsCard from "../components/stats/InsightsCard";
+import EmptyState from "../components/stats/EmptyState";
 
 interface StatsScreenProps {
   navigation?: any;
+  route?: any;
 }
 
-export default function StatsScreen({ navigation }: StatsScreenProps) {
-  const { colors } = useTheme();
+interface StatsData {
+  totalMinutes: number;
+  sessionCount: number;
+  subjectBreakdown: Array<{ subject: Subject; minutes: number }>;
+  weeklyChart: Array<{ day: string; minutes: number }>;
+}
+
+export default function StatsScreen({ navigation, route }: StatsScreenProps) {
+  const { colors, accentColor } = useTheme();
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
-  const [subjects, setSubjects] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [sessions, setSessions] = useState<StudySession[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<"overview" | "calendar">("overview");
+
+  // Period selector state for Overview tab
+  const [selectedPeriod, setSelectedPeriod] = useState<Period>("today");
+
+  // Stats state
+  const [statsData, setStatsData] = useState<StatsData | null>(null);
+  const [streak, setStreak] = useState(0);
+  const [weekTrend, setWeekTrend] = useState(0);
+  const [recentSessions, setRecentSessions] = useState<
+    Array<{ session: StudySession; subject: Subject | null; timeAgo: string }>
+  >([]);
+  const [insights, setInsights] = useState<string[]>([]);
+  const [dailyGoalMinutes, setDailyGoalMinutes] = useState(120);
+
+  // Day detail sheet state
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedSessions, setSelectedSessions] = useState<StudySession[]>([]);
+  const [sheetVisible, setSheetVisible] = useState(false);
 
   useFocusEffect(
     React.useCallback(() => {
-      loadStats();
-    }, [])
+      loadAllData();
+      // Check if navigating from widget with tab param
+      if (route?.params?.tab === "calendar") {
+        setActiveTab("calendar");
+        // Clear the param so it doesn't persist
+        navigation?.setParams({ tab: undefined });
+      }
+    }, [route?.params?.tab])
   );
 
-  const loadStats = async () => {
-    const stats = await StorageService.getDailyStats();
-    const subs = await StorageService.getSubjects();
-    setDailyStats(stats);
-    setSubjects(subs);
+  // Reload data when period changes
+  useEffect(() => {
+    if (!loading) {
+      calculateStatsForPeriod();
+    }
+  }, [selectedPeriod, dailyStats, subjects, sessions]);
+
+  const loadAllData = async () => {
+    setLoading(true);
+    try {
+      const [stats, subs, allSessions, settings, streakVal, trendVal, recentSessionsData] =
+        await Promise.all([
+          StorageService.getDailyStats(),
+          StorageService.getSubjects(),
+          StorageService.getSessions(),
+          StorageService.getUserSettings(),
+          StorageService.calculateStreak(),
+          StorageService.getWeekTrend(),
+          StorageService.getRecentSessionsWithDetails(5),
+        ]);
+
+      setDailyStats(stats);
+      setSubjects(subs);
+      setSessions(allSessions);
+      setDailyGoalMinutes(settings.dailyGoalMinutes);
+      setStreak(streakVal);
+      setWeekTrend(trendVal);
+      setRecentSessions(recentSessionsData);
+
+      // Generate insights
+      await generateInsights(allSessions);
+    } catch (error) {
+      console.error("Error loading stats data:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Calculate stats
-  const calculateStats = () => {
+  const calculateStatsForPeriod = () => {
     const now = new Date();
-    const todayStr = now.toISOString().split("T")[0];
-
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
-
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    let todayMinutes = 0;
-    let weekMinutes = 0;
-    let monthMinutes = 0;
+    let startDate = new Date();
     let totalMinutes = 0;
+    let sessionCount = 0;
     const subjectMinutes: { [key: string]: number } = {};
 
+    // Determine date range based on period
+    switch (selectedPeriod) {
+      case "today":
+        startDate = new Date(now);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case "week":
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 6); // Last 7 days
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case "month":
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case "all":
+        startDate = new Date(0); // Beginning of time
+        break;
+    }
+
+    const startDateStr = startDate.toISOString().split("T")[0];
+
+    // Calculate totals
     dailyStats.forEach((stat) => {
-      const statDate = new Date(stat.date);
-      const minutes = stat.totalMinutes || 0;
+      if (stat.date >= startDateStr) {
+        totalMinutes += stat.totalMinutes;
+        sessionCount += stat.sessions;
 
-      totalMinutes += minutes;
-
-      if (stat.date === todayStr) {
-        todayMinutes += minutes;
+        Object.entries(stat.subjectBreakdown || {}).forEach(([subjectId, minutes]) => {
+          subjectMinutes[subjectId] = (subjectMinutes[subjectId] || 0) + minutes;
+        });
       }
-
-      if (statDate >= startOfWeek) {
-        weekMinutes += minutes;
-      }
-
-      if (statDate >= startOfMonth) {
-        monthMinutes += minutes;
-      }
-
-      // Subject breakdown - aggregate by subject ID
-      Object.entries(stat.subjectBreakdown || {}).forEach(([subjectId, minutes]) => {
-        // Find subject name by ID for display
-        const subjectData = subjects.find((s) => s.id === subjectId);
-        const subjectName = subjectData?.name || subjectId || "Other";
-
-        subjectMinutes[subjectName] =
-          (subjectMinutes[subjectName] || 0) + minutes;
-      });
     });
 
-    return {
-      today: todayMinutes,
-      week: weekMinutes,
-      month: monthMinutes,
-      total: totalMinutes,
-      subjects: subjectMinutes,
-    };
+    // Build subject breakdown with full subject data
+    const subjectBreakdown = Object.entries(subjectMinutes)
+      .map(([subjectId, minutes]) => {
+        const subject = subjects.find((s) => s.id === subjectId);
+        return subject ? { subject, minutes } : null;
+      })
+      .filter((item): item is { subject: Subject; minutes: number } => item !== null);
+
+    // Get last 7 days for chart
+    const weeklyChart = getLast7DaysChart();
+
+    setStatsData({
+      totalMinutes,
+      sessionCount,
+      subjectBreakdown,
+      weeklyChart,
+    });
   };
 
-  const formatTime = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours === 0) return `${mins}m`;
-    return `${hours}h ${mins}m`;
-  };
-
-  const statsData = calculateStats();
-
-  const stats = [
-    {
-      label: "Today",
-      value: formatTime(statsData.today),
-      color: colors.accent,
-    },
-    { label: "This Week", value: formatTime(statsData.week), color: "#34c759" },
-    {
-      label: "This Month",
-      value: formatTime(statsData.month),
-      color: "#ff9500",
-    },
-    { label: "Total", value: formatTime(statsData.total), color: "#af52de" },
-  ];
-
-  // Get last 7 days for chart
-  const getLast7Days = () => {
+  const getLast7DaysChart = () => {
     const days = [];
     const now = new Date();
     for (let i = 6; i >= 0; i--) {
@@ -123,143 +182,268 @@ export default function StatsScreen({ navigation }: StatsScreenProps) {
     return days;
   };
 
-  const last7Days = getLast7Days();
-  const maxMinutes = Math.max(...last7Days.map((d) => d.minutes), 1);
+  const generateInsights = async (allSessions: StudySession[]) => {
+    const insightsList: string[] = [];
+
+    try {
+      // Most productive hour
+      const productiveHour = await StorageService.getMostProductiveHour();
+      if (productiveHour >= 0) {
+        const hourStr = productiveHour === 0 ? "12am" :
+                       productiveHour < 12 ? `${productiveHour}am` :
+                       productiveHour === 12 ? "12pm" :
+                       `${productiveHour - 12}pm`;
+        insightsList.push(`You're most productive at ${hourStr}`);
+      }
+
+      // Week trend
+      if (weekTrend !== 0) {
+        if (weekTrend > 0) {
+          insightsList.push(`Up ${weekTrend}% from last week - keep it up!`);
+        } else {
+          insightsList.push(`Down ${Math.abs(weekTrend)}% from last week`);
+        }
+      }
+
+      // Longest streak
+      const longestStreak = await StorageService.getLongestStreak();
+      if (longestStreak > streak && longestStreak > 1) {
+        insightsList.push(`Your longest streak was ${longestStreak} days`);
+      }
+
+      // Average session duration
+      const avgDuration = await StorageService.getAverageSessionDuration();
+      if (avgDuration > 0) {
+        insightsList.push(`Your average session is ${avgDuration} minutes`);
+      }
+
+      // Current streak encouragement
+      if (streak >= 3) {
+        insightsList.push(`${streak} day streak - you're on fire!`);
+      }
+
+      setInsights(insightsList);
+    } catch (error) {
+      console.error("Error generating insights:", error);
+    }
+  };
+
+  const formatTime = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours === 0) return `${mins}m`;
+    return `${hours}h ${mins}m`;
+  };
+
+  // Handle day press from calendar
+  const handleDayPress = (date: Date, daySessions: StudySession[]) => {
+    setSelectedDate(date);
+    setSelectedSessions(daySessions);
+    setSheetVisible(true);
+  };
+
+  // Close day detail sheet
+  const handleCloseSheet = () => {
+    setSheetVisible(false);
+    setTimeout(() => {
+      setSelectedDate(null);
+      setSelectedSessions([]);
+    }, 300);
+  };
+
+  const handleStartTimer = () => {
+    navigation?.navigate("Focus", { screen: "HomeScreen" });
+  };
+
+  // Check if we have any data at all
+  const hasAnyData = dailyStats.length > 0 && dailyStats.some((s) => s.totalMinutes > 0);
+  const hasPeriodData = statsData && statsData.totalMinutes > 0;
+
+  const getPeriodLabel = () => {
+    switch (selectedPeriod) {
+      case "today":
+        return "today";
+      case "week":
+        return "this week";
+      case "month":
+        return "this month";
+      case "all":
+        return "all time";
+    }
+  };
 
   return (
-    <View style={{ flex: 1 }}>
-      <ScrollView
-        style={[styles.container, { backgroundColor: colors.background }]}
-        contentContainerStyle={styles.content}
-      >
-        <Text style={[styles.title, { color: colors.text }]}>Your Stats</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Track your study progress
-        </Text>
-
-        <View style={styles.statsGrid}>
-          {stats.map((stat, index) => (
-            <View
-              key={index}
-              style={[styles.statCard, { backgroundColor: colors.card }]}
-            >
-              <View
-                style={[styles.statIndicator, { backgroundColor: stat.color }]}
-              />
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-                {stat.label}
-              </Text>
-              <Text style={[styles.statValue, { color: colors.text }]}>
-                {stat.value}
-              </Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Weekly Chart */}
-        <View style={[styles.chartCard, { backgroundColor: colors.card }]}>
-          <Text style={[styles.chartTitle, { color: colors.text }]}>
-            Weekly Activity
+    <View style={[styles.outerContainer, { backgroundColor: colors.background }]}>
+      {/* Header with title and tab selector */}
+      <View style={[styles.headerContainer, { backgroundColor: colors.background }]}>
+        <View style={styles.titleContainer}>
+          <Text style={[styles.title, { color: colors.text }]}>Your Stats</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+            Track your study progress
           </Text>
-          <View style={styles.chartPlaceholder}>
-            {last7Days.map((dayData, index) => {
-              const height =
-                maxMinutes > 0 ? (dayData.minutes / maxMinutes) * 100 : 0;
-              return (
-                <View key={index} style={styles.chartBar}>
-                  <View
-                    style={[
-                      styles.chartBarFill,
-                      {
-                        height: `${Math.max(height, 5)}%`,
-                        backgroundColor: colors.accent,
-                        opacity: dayData.minutes > 0 ? 0.8 : 0.2,
-                      },
-                    ]}
-                  />
-                  <Text
-                    style={[styles.chartDay, { color: colors.textSecondary }]}
-                  >
-                    {dayData.day}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
         </View>
 
-        {/* Subject Breakdown */}
-        {Object.keys(statsData.subjects).length > 0 && (
-          <View
+        {/* Tab Selector */}
+        <View style={[styles.tabContainer, { backgroundColor: colors.card }]}>
+          <TouchableOpacity
             style={[
-              styles.chartCard,
-              { backgroundColor: colors.card, marginTop: 16 },
+              styles.tab,
+              activeTab === "overview" && {
+                backgroundColor: accentColor,
+              },
             ]}
+            onPress={() => setActiveTab("overview")}
+            activeOpacity={0.7}
           >
-            <Text style={[styles.chartTitle, { color: colors.text }]}>
-              Subject Breakdown
+            <Text
+              style={[
+                styles.tabText,
+                {
+                  color:
+                    activeTab === "overview"
+                      ? "#FFFFFF"
+                      : colors.textSecondary,
+                },
+              ]}
+            >
+              Overview
             </Text>
-            <View style={styles.subjectList}>
-              {Object.entries(statsData.subjects)
-                .sort(([, a], [, b]) => (b as number) - (a as number))
-                .map(([subject, minutes]) => {
-                  const subjectData = subjects.find((s) => s.name === subject);
-                  const color = subjectData?.color || colors.accent;
-                  const percentage =
-                    statsData.total > 0
-                      ? (((minutes as number) / statsData.total) * 100).toFixed(
-                          1
-                        )
-                      : 0;
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              activeTab === "calendar" && {
+                backgroundColor: accentColor,
+              },
+            ]}
+            onPress={() => setActiveTab("calendar")}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                {
+                  color:
+                    activeTab === "calendar"
+                      ? "#FFFFFF"
+                      : colors.textSecondary,
+                },
+              ]}
+            >
+              Calendar
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
-                  return (
-                    <View key={subject} style={styles.subjectRow}>
-                      <View style={styles.subjectInfo}>
-                        <View
-                          style={[
-                            styles.subjectDot,
-                            { backgroundColor: color },
-                          ]}
-                        />
-                        <Text
-                          style={[styles.subjectName, { color: colors.text }]}
-                        >
-                          {subject}
-                        </Text>
-                      </View>
-                      <View style={styles.subjectStats}>
-                        <Text
-                          style={[styles.subjectTime, { color: colors.text }]}
-                        >
-                          {formatTime(minutes as number)}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.subjectPercent,
-                            { color: colors.textSecondary },
-                          ]}
-                        >
-                          {percentage}%
-                        </Text>
-                      </View>
-                    </View>
-                  );
-                })}
-            </View>
+      {/* Tab Content */}
+      {activeTab === "overview" ? (
+        loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={accentColor} />
           </View>
-        )}
-      </ScrollView>
+        ) : !hasAnyData ? (
+          <EmptyState type="no-data" onStartTimer={handleStartTimer} />
+        ) : (
+          <ScrollView
+            style={styles.scrollContainer}
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Period Selector */}
+            <PeriodSelector
+              selectedPeriod={selectedPeriod}
+              onPeriodChange={setSelectedPeriod}
+            />
+
+            {!hasPeriodData ? (
+              <EmptyState
+                type="no-period-data"
+                periodLabel={getPeriodLabel()}
+              />
+            ) : (
+              <>
+                {/* Daily Progress Ring - Only show for "today" period */}
+                {selectedPeriod === "today" && (
+                  <DailyProgressRing
+                    currentMinutes={statsData.totalMinutes}
+                    goalMinutes={dailyGoalMinutes}
+                  />
+                )}
+
+                {/* Quick Stats Row */}
+                <QuickStatsRow
+                  weeklyTotal={formatTime(
+                    selectedPeriod === "week"
+                      ? statsData.totalMinutes
+                      : dailyStats
+                          .filter((s) => {
+                            const date = new Date(s.date);
+                            const weekAgo = new Date();
+                            weekAgo.setDate(weekAgo.getDate() - 6);
+                            return date >= weekAgo;
+                          })
+                          .reduce((sum, s) => sum + s.totalMinutes, 0)
+                  )}
+                  weekTrend={weekTrend}
+                  streak={streak}
+                  sessionCount={statsData.sessionCount}
+                />
+
+                {/* Focus Time Chart */}
+                <FocusTimeChart
+                  data={statsData.weeklyChart}
+                  goalMinutes={selectedPeriod === "today" ? dailyGoalMinutes : undefined}
+                />
+
+                {/* Subject Breakdown */}
+                {statsData.subjectBreakdown.length > 0 && (
+                  <SubjectBreakdown
+                    subjects={statsData.subjectBreakdown}
+                    maxDisplay={5}
+                  />
+                )}
+
+                {/* Recent Sessions */}
+                {recentSessions.length > 0 && (
+                  <RecentSessionsList
+                    sessions={recentSessions}
+                    maxDisplay={5}
+                  />
+                )}
+
+                {/* Insights Card */}
+                {insights.length > 0 && <InsightsCard insights={insights} />}
+              </>
+            )}
+          </ScrollView>
+        )
+      ) : (
+        <CalendarView sessions={sessions} onDayPress={handleDayPress} />
+      )}
+
+      {/* Day Detail Sheet */}
+      <DayDetailSheet
+        visible={sheetVisible}
+        date={selectedDate}
+        sessions={selectedSessions}
+        onClose={handleCloseSheet}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  outerContainer: {
     flex: 1,
   },
-  content: {
-    padding: 24,
+  headerContainer: {
     paddingTop: 60,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+  },
+  titleContainer: {
+    marginBottom: 20,
   },
   title: {
     fontSize: 32,
@@ -268,104 +452,32 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 15,
-    marginBottom: 32,
   },
-  statsGrid: {
+  tabContainer: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 16,
-    marginBottom: 24,
+    borderRadius: 12,
+    padding: 4,
   },
-  statCard: {
-    width: "47%",
-    padding: 20,
-    borderRadius: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: "center",
   },
-  statIndicator: {
-    width: 32,
-    height: 4,
-    borderRadius: 2,
-    marginBottom: 12,
-  },
-  statLabel: {
-    fontSize: 13,
-    marginBottom: 4,
-  },
-  statValue: {
-    fontSize: 24,
+  tabText: {
+    fontSize: 15,
     fontWeight: "600",
   },
-  chartCard: {
-    padding: 20,
-    borderRadius: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+  scrollContainer: {
+    flex: 1,
   },
-  chartTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 20,
+  content: {
+    padding: 24,
   },
-  chartPlaceholder: {
-    flexDirection: "row",
-    height: 150,
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  chartBar: {
+  loadingContainer: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "flex-end",
-  },
-  chartBarFill: {
-    width: "100%",
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  chartDay: {
-    fontSize: 12,
-  },
-  subjectList: {
-    gap: 12,
-  },
-  subjectRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 8,
-  },
-  subjectInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  subjectDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  subjectName: {
-    fontSize: 15,
-    fontWeight: "500",
-  },
-  subjectStats: {
-    alignItems: "flex-end",
-  },
-  subjectTime: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  subjectPercent: {
-    fontSize: 12,
-    marginTop: 2,
+    justifyContent: "center",
   },
 });

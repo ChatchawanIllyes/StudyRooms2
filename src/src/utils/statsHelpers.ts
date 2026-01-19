@@ -31,7 +31,8 @@ export function getDailyTotals(
     const dateKey = formatLocalDate(sessionDate);
 
     if (dateKey in dailyTotals) {
-      dailyTotals[dateKey] += Math.floor(session.duration / 60); // convert seconds to minutes
+      // Keep fractional minutes so even 1 second shows up
+      dailyTotals[dateKey] += session.duration / 60; // convert seconds to minutes
     }
   });
 
@@ -50,12 +51,12 @@ export function formatLocalDate(date: Date): string {
 
 /**
  * Calculate intensity level (0-4) based on absolute minutes studied
- * @param minutes - Minutes studied on that day
+ * @param minutes - Minutes studied on that day (can be fractional)
  * @returns Intensity level 0 (empty) to 4 (brightest)
  */
 export function getIntensityLevel(minutes: number): number {
-  if (minutes === 0) return 0;
-  if (minutes < 15) return 1; // 1-14 min
+  if (minutes <= 0) return 0;
+  if (minutes < 15) return 1; // Any study time up to 14 min (even 1 second)
   if (minutes < 30) return 2; // 15-29 min
   if (minutes < 60) return 3; // 30-59 min
   return 4; // 60+ min

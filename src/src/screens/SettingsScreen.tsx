@@ -12,6 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../context/ThemeContext";
+import * as StorageService from "../services/storage";
 
 const COLOR_PALETTE = [
   { name: "Sky Blue", value: "#5b9bd5" },
@@ -44,29 +45,22 @@ export default function SettingsScreen() {
 
   const loadDailyGoal = async () => {
     try {
-      const savedGoal = await AsyncStorage.getItem("dailyStudyGoal");
-      if (savedGoal) {
-        setDailyGoalMinutes(parseInt(savedGoal));
-      }
+      const settings = await StorageService.getUserSettings();
+      setDailyGoalMinutes(settings.dailyGoalMinutes);
+      setBreakDurationMinutes(settings.breakDuration);
     } catch (error) {
-      console.error("Error loading daily goal:", error);
+      console.error("Error loading settings:", error);
     }
   };
 
   const loadBreakDuration = async () => {
-    try {
-      const savedBreak = await AsyncStorage.getItem("breakDuration");
-      if (savedBreak) {
-        setBreakDurationMinutes(parseInt(savedBreak));
-      }
-    } catch (error) {
-      console.error("Error loading break duration:", error);
-    }
+    // Combined with loadDailyGoal - keeping for backward compatibility
+    // but it now does nothing since loadDailyGoal loads both
   };
 
   const saveDailyGoal = async (minutes: number) => {
     try {
-      await AsyncStorage.setItem("dailyStudyGoal", minutes.toString());
+      await StorageService.saveUserSettings({ dailyGoalMinutes: minutes });
       setDailyGoalMinutes(minutes);
     } catch (error) {
       console.error("Error saving daily goal:", error);
@@ -101,7 +95,7 @@ export default function SettingsScreen() {
 
   const saveBreakDuration = async (minutes: number) => {
     try {
-      await AsyncStorage.setItem("breakDuration", minutes.toString());
+      await StorageService.saveUserSettings({ breakDuration: minutes });
       setBreakDurationMinutes(minutes);
     } catch (error) {
       console.error("Error saving break duration:", error);

@@ -8,16 +8,15 @@ import {
   Dimensions,
   ScrollView,
   Modal,
-  AppState,
-  AppStateStatus,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { useTheme } from "../context/ThemeContext";
+import { useStudyTimer } from "../context/StudyTimerContext";
 import * as StorageService from "../services/storage";
-import { StudySession } from "../types";
+import { StudySession, Subject as ContextSubject } from "../types";
 
 type TimerMode = "focus" | "break";
 type TimerState = "idle" | "running" | "paused";
@@ -56,16 +55,20 @@ interface TimerScreenProps {
 
 export default function TimerScreen({ navigation }: TimerScreenProps) {
   const { colors } = useTheme();
+  const studyTimer = useStudyTimer();
+
+  // Mode state (focus/break) - break mode is separate from StudyTimerContext
   const [mode, setMode] = useState<TimerMode>("focus");
-  const [state, setState] = useState<TimerState>("idle");
-  const [seconds, setSeconds] = useState(0);
-  const [todayMinutes, setTodayMinutes] = useState(68);
-  const [dailyGoal, setDailyGoal] = useState(120);
-  const [breakDuration, setBreakDuration] = useState(5 * 60); // Default: 5 minutes
   const [modeAnimation] = useState(new Animated.Value(0));
-  const [selectedSubject, setSelectedSubject] = useState<Subject>(
-    DEFAULT_SUBJECTS[0]
-  );
+
+  // Break mode state (only used when mode === "break")
+  const [breakState, setBreakState] = useState<TimerState>("idle");
+  const [breakSeconds, setBreakSeconds] = useState(0);
+  const [breakDuration, setBreakDuration] = useState(5 * 60); // Default: 5 minutes
+
+  // UI state
+  const [todayMinutes, setTodayMinutes] = useState(0);
+  const [dailyGoal, setDailyGoal] = useState(120);
   const [showSubjectPicker, setShowSubjectPicker] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [recentSessions, setRecentSessions] = useState<StudySession[]>([]);
@@ -73,27 +76,33 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
   const [selectedDuration, setSelectedDuration] = useState(25); // default 25 min
   const [showDurationPicker, setShowDurationPicker] = useState(false);
 
-  const [appStateValue, setAppStateValue] = useState<AppStateStatus>("active");
-  const backgroundTimeRef = useRef<number>(0);
-  const notificationIdRef = useRef<string | null>(null);
+  // Local subject selection (synced with context when starting)
+  const [localSelectedSubject, setLocalSelectedSubject] = useState<Subject>(
+    DEFAULT_SUBJECTS[0]
+  );
 
   const loadDailyGoal = async () => {
     try {
-      const savedGoal = await AsyncStorage.getItem("dailyStudyGoal");
-      if (savedGoal) {
-        setDailyGoal(parseInt(savedGoal));
-      }
+      const settings = await StorageService.getUserSettings();
+      setDailyGoal(settings.dailyGoalMinutes);
     } catch (error) {
       console.error("Error loading daily goal:", error);
     }
   };
 
+  const loadTodayMinutes = async () => {
+    try {
+      const stats = await StorageService.getTodayStats();
+      setTodayMinutes(stats.totalMinutes);
+    } catch (error) {
+      console.error("Error loading today's minutes:", error);
+    }
+  };
+
   const loadBreakDuration = async () => {
     try {
-      const savedBreak = await AsyncStorage.getItem("breakDuration");
-      if (savedBreak) {
-        setBreakDuration(parseInt(savedBreak) * 60); // Convert minutes to seconds
-      }
+      const settings = await StorageService.getUserSettings();
+      setBreakDuration(settings.breakDuration * 60); // Convert minutes to seconds
     } catch (error) {
       console.error("Error loading break duration:", error);
     }
@@ -115,6 +124,7 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
   useFocusEffect(
     React.useCallback(() => {
       loadDailyGoal();
+      loadTodayMinutes();
       loadBreakDuration();
       loadRecentSessions();
     }, [])
@@ -140,88 +150,45 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
     }
   };
 
-  // Background timer support
-  useEffect(() => {
-    const subscription = AppState.addEventListener(
-      "change",
-      handleAppStateChange
-    );
-
-    return () => {
-      subscription.remove();
-    };
-  }, [state, mode, seconds]);
-
-  const handleAppStateChange = (nextAppState: AppStateStatus) => {
-    if (
-      appStateValue.match(/inactive|background/) &&
-      nextAppState === "active"
-    ) {
-      // App has come to foreground
-      if (state === "running" && backgroundTimeRef.current > 0) {
-        const elapsedSeconds = Math.floor(
-          (Date.now() - backgroundTimeRef.current) / 1000
-        );
-
-        setSeconds((prev) => {
-          if (mode === "focus") {
-            return prev + elapsedSeconds;
-          } else {
-            // Break mode: count down
-            const newTime = prev - elapsedSeconds;
-            if (newTime <= 0) {
-              setState("idle");
-              return 0;
-            }
-            return newTime;
-          }
-        });
-        backgroundTimeRef.current = 0;
-      }
-    } else if (
-      appStateValue === "active" &&
-      nextAppState.match(/inactive|background/)
-    ) {
-      // App has gone to background
-      if (state === "running") {
-        backgroundTimeRef.current = Date.now();
-      }
-    }
-
-    setAppStateValue(nextAppState);
-  };
-
+  // Break mode timer (only runs when in break mode)
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (state === "running") {
+    if (mode === "break" && breakState === "running") {
       interval = setInterval(() => {
-        setSeconds((s) => {
-          if (mode === "focus") {
-            // Focus mode: count up
-            const newTime = s + 1;
-            // Check if focus session is complete
-            if (newTime >= selectedDuration * 60) {
-              setState("idle");
-              playCompletionSound();
-              handleStop();
-              return newTime;
-            }
-            return newTime;
-          } else {
-            // Break mode: count down
-            if (s <= 1) {
-              // Timer finished
-              setState("idle");
-              playCompletionSound();
-              return 0;
-            }
-            return s - 1;
+        setBreakSeconds((s) => {
+          if (s <= 1) {
+            // Timer finished
+            setBreakState("idle");
+            playCompletionSound();
+            return 0;
           }
+          return s - 1;
         });
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [state, mode, selectedDuration]);
+  }, [mode, breakState]);
+
+  // Sync local subject with context subject when timer is running
+  useEffect(() => {
+    if (mode === "focus" && studyTimer.currentSubject) {
+      // Map context subject to local format
+      const localSubject = DEFAULT_SUBJECTS.find(
+        (s) => s.id === studyTimer.currentSubject?.id
+      );
+      if (localSubject) {
+        setLocalSelectedSubject(localSubject);
+      }
+    }
+  }, [studyTimer.currentSubject, mode]);
+
+  // Sync context's showSubjectModal with local showSubjectPicker
+  useEffect(() => {
+    if (mode === "focus" && studyTimer.showSubjectModal) {
+      setShowSubjectPicker(true);
+      studyTimer.setShowSubjectModal(false);
+    }
+  }, [studyTimer.showSubjectModal, mode]);
 
   useEffect(() => {
     Animated.spring(modeAnimation, {
@@ -231,14 +198,13 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
       friction: 10,
     }).start();
 
-    // Reset timer when switching modes
-    setState("idle");
+    // Reset break timer when switching to break mode
     if (mode === "break") {
-      setSeconds(breakDuration);
-    } else {
-      setSeconds(0);
+      setBreakState("idle");
+      setBreakSeconds(breakDuration);
     }
-  }, [mode]);
+    // Focus mode uses context timer, no need to reset
+  }, [mode, breakDuration]);
 
   const formatTime = (totalSeconds: number) => {
     const h = Math.floor(totalSeconds / 3600);
@@ -251,56 +217,43 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
   };
 
   const handlePrimaryAction = () => {
-    if (state === "idle") {
-      setState("running");
-    } else if (state === "running") {
-      setState("paused");
-    } else if (state === "paused") {
-      setState("running");
-    }
-  };
+    if (mode === "focus") {
+      // Focus mode uses StudyTimerContext
+      const isIdle = !studyTimer.isRunning && !studyTimer.isPaused;
+      const isRunning = studyTimer.isRunning && !studyTimer.isPaused;
+      const isPaused = studyTimer.isPaused;
 
-  const handleStop = () => {
-    // Only add to study time if in Focus mode
-    if (seconds > 0 && mode === "focus") {
-      const minutesStudied = Math.floor(seconds / 60);
-      setTodayMinutes((prev) => prev + minutesStudied);
-
-      // Save study session with subject
-      saveStudySession(selectedSubject.id, seconds);
-    }
-    setState("idle");
-    if (mode === "break") {
-      setSeconds(breakDuration);
+      if (isIdle) {
+        // Show subject modal before starting
+        studyTimer.setShowSubjectModal(true);
+      } else if (isRunning) {
+        studyTimer.pause();
+      } else if (isPaused) {
+        studyTimer.resume();
+      }
     } else {
-      setSeconds(0);
+      // Break mode uses local state
+      if (breakState === "idle") {
+        setBreakState("running");
+      } else if (breakState === "running") {
+        setBreakState("paused");
+      } else if (breakState === "paused") {
+        setBreakState("running");
+      }
     }
   };
 
-  const saveStudySession = async (subjectId: string, duration: number) => {
-    try {
-      // Generate unique ID (Supabase-compatible format)
-      const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-      // Find subject name from ID
-      const subject = DEFAULT_SUBJECTS.find((s) => s.id === subjectId);
-      const subjectName = subject?.name || "Other";
-
-      const session: StudySession = {
-        id: sessionId,
-        subject: subjectName,
-        subjectId: subjectId,
-        duration: duration,
-        date: new Date().toISOString(),
-      };
-
-      // Use storage service to add session
-      await StorageService.addSession(session);
-
-      // Reload recent sessions
+  const handleStop = async () => {
+    if (mode === "focus") {
+      // Focus mode: use context's stopAndSave (auto-saves)
+      await studyTimer.stopAndSave();
+      // Reload today's minutes and recent sessions
+      loadTodayMinutes();
       loadRecentSessions();
-    } catch (error) {
-      console.error("Error saving study session:", error);
+    } else {
+      // Break mode: just reset local state
+      setBreakState("idle");
+      setBreakSeconds(breakDuration);
     }
   };
 
@@ -334,13 +287,37 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
 
   const progress = Math.min((todayMinutes / dailyGoal) * 100, 100);
 
+  // Get current timer state based on mode
+  const getCurrentState = (): TimerState => {
+    if (mode === "focus") {
+      const isIdle = !studyTimer.isRunning && !studyTimer.isPaused;
+      const isRunning = studyTimer.isRunning && !studyTimer.isPaused;
+      if (isIdle) return "idle";
+      if (isRunning) return "running";
+      return "paused";
+    } else {
+      return breakState;
+    }
+  };
+
+  // Get current timer seconds based on mode
+  const getCurrentSeconds = (): number => {
+    if (mode === "focus") {
+      return Math.floor(studyTimer.elapsedMs / 1000);
+    } else {
+      return breakSeconds;
+    }
+  };
+
   const getButtonText = () => {
+    const state = getCurrentState();
     if (state === "idle") return "Start";
     if (state === "running") return "Pause";
     return "Resume";
   };
 
   const getButtonColor = () => {
+    const state = getCurrentState();
     if (mode === "break") {
       // Break mode uses green/teal colors
       if (state === "idle") return "#34c759";
@@ -355,6 +332,7 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
   };
 
   const getButtonIcon = () => {
+    const state = getCurrentState();
     if (state === "running") return "pause";
     return "play";
   };
@@ -441,14 +419,14 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
               { color: mode === "break" ? "#34c759" : colors.text },
             ]}
           >
-            {formatTime(seconds)}
+            {formatTime(getCurrentSeconds())}
           </Text>
-          {mode === "break" && state === "idle" && (
+          {mode === "break" && getCurrentState() === "idle" && (
             <Text style={[styles.breakHint, { color: colors.textSecondary }]}>
               Take a {Math.floor(breakDuration / 60)} minute break
             </Text>
           )}
-          {mode === "focus" && state === "idle" && (
+          {mode === "focus" && getCurrentState() === "idle" && (
             <Text style={[styles.breakHint, { color: colors.textSecondary }]}>
               Ready to focus
             </Text>
@@ -468,7 +446,7 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
             <Ionicons name={getButtonIcon()} size={24} color="white" />
             <Text style={styles.primaryButtonText}>{getButtonText()}</Text>
           </TouchableOpacity>
-          {state !== "idle" && (
+          {getCurrentState() !== "idle" && (
             <TouchableOpacity
               style={[
                 styles.stopButton,
@@ -492,19 +470,37 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
             </Text>
             <TouchableOpacity
               style={[styles.subjectSelector, { backgroundColor: colors.card }]}
-              onPress={() => setShowSubjectPicker(true)}
+              onPress={() => {
+                if (getCurrentState() === "idle") {
+                  setShowSubjectPicker(true);
+                } else {
+                  // If timer is running, show modal to change subject
+                  setShowSubjectPicker(true);
+                }
+              }}
               activeOpacity={0.7}
             >
               <View
                 style={[
                   styles.subjectIconContainer,
-                  { backgroundColor: selectedSubject.color },
+                  {
+                    backgroundColor:
+                      studyTimer.currentSubject?.color ||
+                      localSelectedSubject.color,
+                  },
                 ]}
               >
-                <Ionicons name={selectedSubject.icon} size={20} color="white" />
+                <Ionicons
+                  name={
+                    studyTimer.currentSubject?.icon ||
+                    localSelectedSubject.icon
+                  }
+                  size={20}
+                  color="white"
+                />
               </View>
               <Text style={[styles.subjectText, { color: colors.text }]}>
-                {selectedSubject.name}
+                {studyTimer.currentSubject?.name || localSelectedSubject.name}
               </Text>
               <Ionicons
                 name="chevron-down"
@@ -709,48 +705,78 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
             </View>
 
             <ScrollView style={styles.subjectList}>
-              {DEFAULT_SUBJECTS.map((subject) => (
-                <TouchableOpacity
-                  key={subject.id}
-                  style={[
-                    styles.subjectOption,
-                    { backgroundColor: colors.background },
-                    selectedSubject.id === subject.id && {
-                      backgroundColor: subject.color + "20",
-                      borderColor: subject.color,
-                      borderWidth: 2,
-                    },
-                  ]}
-                  onPress={() => {
-                    setSelectedSubject(subject);
-                    setShowSubjectPicker(false);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.subjectOptionLeft}>
-                    <View
-                      style={[
-                        styles.subjectIconContainer,
-                        { backgroundColor: subject.color },
-                      ]}
-                    >
-                      <Ionicons name={subject.icon} size={24} color="white" />
+              {DEFAULT_SUBJECTS.map((subject) => {
+                const currentSubjectId =
+                  studyTimer.currentSubject?.id || localSelectedSubject.id;
+                const isSelected = currentSubjectId === subject.id;
+
+                return (
+                  <TouchableOpacity
+                    key={subject.id}
+                    style={[
+                      styles.subjectOption,
+                      { backgroundColor: colors.background },
+                      isSelected && {
+                        backgroundColor: subject.color + "20",
+                        borderColor: subject.color,
+                        borderWidth: 2,
+                      },
+                    ]}
+                    onPress={async () => {
+                      // Convert local Subject to context Subject format
+                      const contextSubject: ContextSubject = {
+                        id: subject.id,
+                        name: subject.name,
+                        icon: subject.icon,
+                        color: subject.color,
+                      };
+
+                      if (getCurrentState() === "idle") {
+                        // Starting new timer: update local and will start with this subject
+                        setLocalSelectedSubject(subject);
+                        studyTimer.startWithSubject(contextSubject);
+                      } else {
+                        // Timer running: change subject via context
+                        await studyTimer.changeSubject(contextSubject);
+                        loadRecentSessions();
+                        loadTodayMinutes();
+                      }
+                      setShowSubjectPicker(false);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.subjectOptionLeft}>
+                      <View
+                        style={[
+                          styles.subjectIconContainer,
+                          { backgroundColor: subject.color },
+                        ]}
+                      >
+                        <Ionicons
+                          name={subject.icon}
+                          size={24}
+                          color="white"
+                        />
+                      </View>
+                      <Text
+                        style={[
+                          styles.subjectOptionText,
+                          { color: colors.text },
+                        ]}
+                      >
+                        {subject.name}
+                      </Text>
                     </View>
-                    <Text
-                      style={[styles.subjectOptionText, { color: colors.text }]}
-                    >
-                      {subject.name}
-                    </Text>
-                  </View>
-                  {selectedSubject.id === subject.id && (
-                    <Ionicons
-                      name="checkmark"
-                      size={24}
-                      color={subject.color}
-                    />
-                  )}
-                </TouchableOpacity>
-              ))}
+                    {isSelected && (
+                      <Ionicons
+                        name="checkmark"
+                        size={24}
+                        color={subject.color}
+                      />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           </View>
         </View>

@@ -10,7 +10,7 @@ import Animated, {
 interface StatCardProps {
   label: string;
   value: string;
-  icon?: string;
+  icon?: React.ReactNode;
   trend?: number; // percentage, positive = up, negative = down
   onPress?: () => void;
 }
@@ -61,7 +61,7 @@ export default function StatCard({
         </Text>
         <View style={styles.valueRow}>
           <Text style={[styles.value, { color: colors.text }]}>{value}</Text>
-          {icon && <Text style={styles.icon}>{icon}</Text>}
+          {icon && <View style={styles.iconContainer}>{icon}</View>}
         </View>
         {trend !== undefined && trend !== 0 && (
           <View style={styles.trendContainer}>
@@ -125,10 +125,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     lineHeight: 28, // Explicit line height for consistent baseline
   },
-  icon: {
-    fontSize: 24,
-    lineHeight: 28, // Match value line height
+  iconContainer: {
     marginLeft: 6,
+    justifyContent: "center",
+    alignItems: "center",
   },
   trendContainer: {
     flexDirection: "row",

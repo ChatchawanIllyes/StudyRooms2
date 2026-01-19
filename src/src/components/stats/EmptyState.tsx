@@ -1,6 +1,16 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../context/ThemeContext";
+
+const AnimatedIonicons = Animated.createAnimatedComponent(Ionicons);
 
 interface EmptyStateProps {
   type: "no-data" | "no-period-data";
@@ -15,10 +25,53 @@ export default function EmptyState({
 }: EmptyStateProps) {
   const { colors, accentColor } = useTheme();
 
+  // Floating animation for book icon (moves up and down gently)
+  const translateY = useSharedValue(0);
+
+  // Breathing animation for chart icon (scales in and out gently)
+  const scale = useSharedValue(1);
+
+  useEffect(() => {
+    if (type === "no-data") {
+      // Floating animation
+      translateY.value = withRepeat(
+        withSequence(
+          withTiming(-8, { duration: 1500 }),
+          withTiming(0, { duration: 1500 })
+        ),
+        -1, // infinite
+        false
+      );
+    } else {
+      // Breathing animation
+      scale.value = withRepeat(
+        withSequence(
+          withTiming(0.95, { duration: 1500 }),
+          withTiming(1.05, { duration: 1500 })
+        ),
+        -1,
+        false
+      );
+    }
+  }, [type]);
+
+  const floatingStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  const breathingStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
   if (type === "no-data") {
     return (
       <View style={styles.container}>
-        <Text style={styles.icon}>📚</Text>
+        <AnimatedIonicons
+          name="book-outline"
+          size={64}
+          color={accentColor}
+          style={floatingStyle}
+        />
         <Text style={[styles.title, { color: colors.text }]}>
           Start Your Study Journey
         </Text>
@@ -40,7 +93,12 @@ export default function EmptyState({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.icon}>📊</Text>
+      <AnimatedIonicons
+        name="analytics-outline"
+        size={64}
+        color={accentColor}
+        style={breathingStyle}
+      />
       <Text style={[styles.title, { color: colors.text }]}>
         No study time recorded
       </Text>
@@ -59,10 +117,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 60,
     paddingHorizontal: 40,
-  },
-  icon: {
-    fontSize: 64,
-    marginBottom: 20,
+    gap: 20,
   },
   title: {
     fontSize: 24,

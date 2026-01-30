@@ -74,6 +74,12 @@ export default function MyRoomsScreen({ navigation }: MyRoomsScreenProps) {
   );
 
   const handleRoomPress = (room: Room) => {
+    // Navigate directly to room session
+    navigation.navigate('RoomSession', { roomId: room.id });
+  };
+
+  const handleRoomLongPress = (room: Room) => {
+    // Show room details modal on long press
     setSelectedRoom(room);
     setShowModal(true);
     setPasswordError(false);
@@ -168,6 +174,7 @@ export default function MyRoomsScreen({ navigation }: MyRoomsScreenProps) {
                 key={room.id}
                 style={[styles.roomCard, { backgroundColor: colors.card }]}
                 onPress={() => handleRoomPress(room)}
+                onLongPress={() => handleRoomLongPress(room)}
                 activeOpacity={0.7}
               >
                 <View style={styles.roomHeader}>

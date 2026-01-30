@@ -70,7 +70,16 @@ export default function JoinRoomScreen({ navigation }: JoinRoomScreenProps) {
       ...room,
       members: [
         ...(room.members || []),
-        { id: userId, name: userName, status: "idle" as const },
+        {
+          id: userId,
+          name: userName,
+          status: "idle" as const,
+          todayStats: {
+            totalStudyTime: 0,
+            sessionsCompleted: 0,
+            lastActive: Date.now(),
+          }
+        },
       ],
       memberCount: (room.memberCount || 0) + 1,
     };
@@ -79,7 +88,9 @@ export default function JoinRoomScreen({ navigation }: JoinRoomScreenProps) {
     setRooms(updatedRooms);
     await saveRooms(updatedRooms);
     setShowModal(false);
-    navigation.goBack();
+
+    // Navigate to the room session instead of going back
+    navigation.navigate('RoomSession', { roomId: room.id });
   };
 
   if (loading) {

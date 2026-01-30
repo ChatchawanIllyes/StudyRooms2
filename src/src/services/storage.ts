@@ -265,7 +265,6 @@ export const getUserSettings = async (): Promise<UserSettings> => {
       : {
           dailyGoal: 120,
           dailyGoalMinutes: 120,
-          breakDuration: 5,
           focusDuration: 25,
           soundEnabled: true,
         };
@@ -274,7 +273,6 @@ export const getUserSettings = async (): Promise<UserSettings> => {
     return {
       dailyGoal: 120,
       dailyGoalMinutes: 120,
-      breakDuration: 5,
       focusDuration: 25,
       soundEnabled: true,
     };
@@ -672,6 +670,147 @@ export const addDummyStudySessions = async (): Promise<number> => {
     return sessionsAdded;
   } catch (error) {
     console.error("Error adding dummy sessions:", error);
+    return 0;
+  }
+};
+
+// Generate realistic dummy data for entire year 2026
+export const generateFullYearDummyData = async (): Promise<number> => {
+  try {
+    // First, clear all existing data
+    await clearAllData();
+    console.log("Cleared all existing data");
+
+    // Get subjects
+    const subjects = await getSubjects();
+
+    // Select subjects with different study patterns
+    const subjectPool = [
+      subjects.find(s => s.id === "math") || subjects[0],
+      subjects.find(s => s.id === "science") || subjects[1],
+      subjects.find(s => s.id === "programming") || subjects[2],
+      subjects.find(s => s.id === "english") || subjects[3],
+      subjects.find(s => s.id === "history") || subjects[4],
+      subjects.find(s => s.id === "art") || subjects[5],
+    ];
+
+    let sessionsAdded = 0;
+
+    // Generate data for each day of 2026
+    for (let month = 0; month < 12; month++) {
+      const daysInMonth = new Date(2026, month + 1, 0).getDate();
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const currentDate = new Date(2026, month, day);
+        const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
+
+        // Determine if this is a study day (realistic patterns)
+        // 85% chance of studying on weekdays, 50% chance on weekends
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        const studyProbability = isWeekend ? 0.5 : 0.85;
+        const shouldStudy = Math.random() < studyProbability;
+
+        if (!shouldStudy) continue;
+
+        // Determine daily study intensity (in minutes)
+        // Light: 20-45 min (30%), Moderate: 45-90 min (40%), Heavy: 90-180 min (25%), Very Heavy: 180-240 min (5%)
+        let totalDailyMinutes: number;
+        const intensityRoll = Math.random();
+
+        if (intensityRoll < 0.30) {
+          // Light day
+          totalDailyMinutes = 20 + Math.floor(Math.random() * 25);
+        } else if (intensityRoll < 0.70) {
+          // Moderate day
+          totalDailyMinutes = 45 + Math.floor(Math.random() * 45);
+        } else if (intensityRoll < 0.95) {
+          // Heavy day
+          totalDailyMinutes = 90 + Math.floor(Math.random() * 90);
+        } else {
+          // Very heavy day
+          totalDailyMinutes = 180 + Math.floor(Math.random() * 60);
+        }
+
+        // Weekends typically have less study time
+        if (isWeekend) {
+          totalDailyMinutes = Math.floor(totalDailyMinutes * 0.6);
+        }
+
+        // Distribute time across 1-3 subjects
+        const numSubjects = Math.min(
+          1 + Math.floor(Math.random() * 2.5),
+          subjectPool.length
+        );
+
+        // Randomly select subjects for the day
+        const shuffledSubjects = [...subjectPool].sort(() => Math.random() - 0.5);
+        const dailySubjects = shuffledSubjects.slice(0, numSubjects);
+
+        // Distribute time among subjects (weighted randomly)
+        const weights = dailySubjects.map(() => Math.random());
+        const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+        const subjectMinutes = weights.map(w =>
+          Math.floor((w / totalWeight) * totalDailyMinutes)
+        );
+
+        // Create sessions for each subject
+        for (let i = 0; i < dailySubjects.length; i++) {
+          const subject = dailySubjects[i];
+          let remainingMinutes = subjectMinutes[i];
+
+          // Skip if very low time allocated
+          if (remainingMinutes < 10) continue;
+
+          // Split into 1-3 sessions per subject based on total time
+          const numSessions = remainingMinutes > 90 ? 2 + Math.floor(Math.random() * 2) :
+                             remainingMinutes > 45 ? 1 + Math.floor(Math.random() * 2) : 1;
+
+          for (let sessionNum = 0; sessionNum < numSessions; sessionNum++) {
+            const sessionMinutes = Math.floor(remainingMinutes / (numSessions - sessionNum));
+            remainingMinutes -= sessionMinutes;
+
+            if (sessionMinutes < 5) continue;
+
+            // Generate realistic session time (spread throughout the day)
+            // Morning: 6-9am, Mid-morning: 9-12pm, Afternoon: 1-5pm, Evening: 6-10pm, Night: 10pm-12am
+            const timeSlots = [
+              { start: 6, end: 9 },   // Morning
+              { start: 9, end: 12 },  // Mid-morning
+              { start: 13, end: 17 }, // Afternoon
+              { start: 18, end: 22 }, // Evening
+              { start: 22, end: 24 }, // Night
+            ];
+
+            const timeSlot = timeSlots[Math.floor(Math.random() * timeSlots.length)];
+            const hour = timeSlot.start + Math.floor(Math.random() * (timeSlot.end - timeSlot.start));
+            const minute = Math.floor(Math.random() * 60);
+
+            const sessionDate = new Date(2026, month, day, hour, minute, 0);
+
+            const session: StudySession = {
+              id: `dummy_2026_${month}_${day}_${subject.id}_${sessionNum}_${Date.now()}_${Math.random()}`,
+              subject: subject.name,
+              subjectId: subject.id,
+              duration: sessionMinutes * 60, // Convert to seconds
+              date: sessionDate.toISOString(),
+              notes: "Generated dummy session",
+              pauseCount: Math.floor(Math.random() * (sessionMinutes / 15)), // ~1 pause per 15 min
+            };
+
+            await addSession(session);
+            sessionsAdded++;
+
+            // Small delay to prevent ID collisions
+            await new Promise(resolve => setTimeout(resolve, 1));
+          }
+        }
+      }
+    }
+
+    console.log(`Generated ${sessionsAdded} realistic study sessions for all of 2026`);
+    return sessionsAdded;
+  } catch (error) {
+    console.error("Error generating full year dummy data:", error);
     return 0;
   }
 };

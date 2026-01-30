@@ -53,8 +53,8 @@ export default function TimerWidget({
     setSubjects(loadedSubjects);
   };
 
-  const handleSubjectSelect = (subject: Subject) => {
-    startWithSubject(subject);
+  const handleSubjectSelect = async (subject: Subject) => {
+    await startWithSubject(subject);
   };
 
   const handleChangeSubject = async (subject: Subject) => {

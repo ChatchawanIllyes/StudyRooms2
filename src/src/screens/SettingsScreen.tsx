@@ -8,6 +8,7 @@ import {
   Switch,
   Modal,
   TextInput,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -31,31 +32,22 @@ export default function SettingsScreen() {
     useTheme();
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showGoalPicker, setShowGoalPicker] = useState(false);
-  const [showBreakPicker, setShowBreakPicker] = useState(false);
   const [dailyGoalMinutes, setDailyGoalMinutes] = useState(120); // Default: 2 hours
-  const [breakDurationMinutes, setBreakDurationMinutes] = useState(5); // Default: 5 minutes
   const [tempHours, setTempHours] = useState("2");
   const [tempMinutes, setTempMinutes] = useState("0");
-  const [tempBreakMinutes, setTempBreakMinutes] = useState("5");
+  const [isGeneratingData, setIsGeneratingData] = useState(false);
 
   useEffect(() => {
-    loadDailyGoal();
-    loadBreakDuration();
+    loadSettings();
   }, []);
 
-  const loadDailyGoal = async () => {
+  const loadSettings = async () => {
     try {
       const settings = await StorageService.getUserSettings();
       setDailyGoalMinutes(settings.dailyGoalMinutes);
-      setBreakDurationMinutes(settings.breakDuration);
     } catch (error) {
       console.error("Error loading settings:", error);
     }
-  };
-
-  const loadBreakDuration = async () => {
-    // Combined with loadDailyGoal - keeping for backward compatibility
-    // but it now does nothing since loadDailyGoal loads both
   };
 
   const saveDailyGoal = async (minutes: number) => {
@@ -93,26 +85,39 @@ export default function SettingsScreen() {
     setShowGoalPicker(false);
   };
 
-  const saveBreakDuration = async (minutes: number) => {
-    try {
-      await StorageService.saveUserSettings({ breakDuration: minutes });
-      setBreakDurationMinutes(minutes);
-    } catch (error) {
-      console.error("Error saving break duration:", error);
-    }
-  };
-
-  const openBreakPicker = () => {
-    setTempBreakMinutes(breakDurationMinutes.toString());
-    setShowBreakPicker(true);
-  };
-
-  const saveBreak = () => {
-    const mins = parseInt(tempBreakMinutes) || 0;
-    if (mins > 0) {
-      saveBreakDuration(mins);
-    }
-    setShowBreakPicker(false);
+  const handleGenerateDummyData = async () => {
+    Alert.alert(
+      "Generate Dummy Data",
+      "This will clear ALL existing study sessions and replace them with realistic dummy data for 2026. Are you sure?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Generate",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setIsGeneratingData(true);
+              const count = await StorageService.generateFullYearDummyData();
+              Alert.alert(
+                "Success!",
+                `Generated ${count} realistic study sessions for 2026. Your heatmap should now be fully populated.`
+              );
+            } catch (error) {
+              console.error("Error generating dummy data:", error);
+              Alert.alert(
+                "Error",
+                "Failed to generate dummy data. Please try again."
+              );
+            } finally {
+              setIsGeneratingData(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -145,33 +150,6 @@ export default function SettingsScreen() {
               <View style={styles.settingRight}>
                 <Text style={[styles.goalValue, { color: accentColor }]}>
                   {formatGoalTime(dailyGoalMinutes)}
-                </Text>
-                <Ionicons
-                  name="chevron-forward"
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </View>
-            </TouchableOpacity>
-
-            <View
-              style={[styles.divider, { backgroundColor: colors.border }]}
-            />
-
-            <TouchableOpacity
-              style={styles.settingRow}
-              onPress={openBreakPicker}
-              activeOpacity={0.7}
-            >
-              <View style={styles.settingLeft}>
-                <Ionicons name="cafe" size={22} color={colors.textSecondary} />
-                <Text style={[styles.settingLabel, { color: colors.text }]}>
-                  Break Duration
-                </Text>
-              </View>
-              <View style={styles.settingRight}>
-                <Text style={[styles.goalValue, { color: "#34c759" }]}>
-                  {formatGoalTime(breakDurationMinutes)}
                 </Text>
                 <Ionicons
                   name="chevron-forward"
@@ -272,6 +250,49 @@ export default function SettingsScreen() {
                 size={20}
                 color={colors.textSecondary}
               />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Developer Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+            Developer
+          </Text>
+
+          <View style={[styles.settingsCard, { backgroundColor: colors.card }]}>
+            <TouchableOpacity
+              style={styles.settingRow}
+              activeOpacity={0.7}
+              onPress={handleGenerateDummyData}
+              disabled={isGeneratingData}
+            >
+              <View style={styles.settingLeft}>
+                <Ionicons
+                  name="albums"
+                  size={22}
+                  color={accentColor}
+                />
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingLabel, { color: colors.text }]}>
+                    Generate Heatmap Data
+                  </Text>
+                  <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
+                    Fill 2026 with realistic study sessions
+                  </Text>
+                </View>
+              </View>
+              {isGeneratingData ? (
+                <Text style={[styles.generatingText, { color: accentColor }]}>
+                  Generating...
+                </Text>
+              ) : (
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color={colors.textSecondary}
+                />
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -479,105 +500,6 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
-
-      {/* Break Duration Picker Modal */}
-      <Modal
-        visible={showBreakPicker}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowBreakPicker(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                Break Duration
-              </Text>
-              <TouchableOpacity onPress={() => setShowBreakPicker(false)}>
-                <Ionicons name="close" size={28} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.goalPicker}>
-              <View style={styles.breakInputContainer}>
-                <View style={styles.timeInput}>
-                  <TextInput
-                    style={[
-                      styles.timeTextInput,
-                      { color: "#34c759", borderColor: "#34c759" },
-                    ]}
-                    value={tempBreakMinutes}
-                    onChangeText={(text) => {
-                      const num = parseInt(text) || 0;
-                      if (num <= 60) setTempBreakMinutes(text);
-                    }}
-                    keyboardType="number-pad"
-                    maxLength={2}
-                    selectTextOnFocus
-                    placeholderTextColor={colors.textSecondary}
-                  />
-                  <Text
-                    style={[styles.timeLabel, { color: colors.textSecondary }]}
-                  >
-                    minutes
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.quickGoals}>
-                <Text
-                  style={[
-                    styles.quickGoalsLabel,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  Quick Select:
-                </Text>
-                <View style={styles.quickGoalsButtons}>
-                  {[5, 10, 15].map((mins) => (
-                    <TouchableOpacity
-                      key={mins}
-                      style={[
-                        styles.quickGoalButton,
-                        {
-                          backgroundColor: colors.background,
-                          borderColor: colors.border,
-                        },
-                        breakDurationMinutes === mins && {
-                          backgroundColor: "#34c759",
-                          borderColor: "#34c759",
-                        },
-                      ]}
-                      onPress={() => {
-                        setTempBreakMinutes(mins.toString());
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          styles.quickGoalText,
-                          { color: colors.text },
-                          breakDurationMinutes === mins && { color: "white" },
-                        ]}
-                      >
-                        {mins}m
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={[styles.saveButton, { backgroundColor: "#34c759" }]}
-                onPress={saveBreak}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.saveButtonText}>Save Break Duration</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -775,6 +697,17 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: "white",
     fontSize: 17,
+    fontWeight: "600",
+  },
+  settingTextContainer: {
+    flex: 1,
+  },
+  settingDescription: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  generatingText: {
+    fontSize: 14,
     fontWeight: "600",
   },
 });

@@ -176,7 +176,7 @@ export default function PlaceWidgetScreen() {
           </TouchableOpacity>
           <Text style={[styles.title, { color: colors.text }]}>
             Place Widget
-          </Text>
+          </Text> 
           <View style={styles.placeholder} />
         </View>
 

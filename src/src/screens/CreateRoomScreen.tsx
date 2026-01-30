@@ -50,8 +50,10 @@ export default function CreateRoomScreen({
       const userName = await getUserName();
       const rooms = await loadRooms();
 
+      const now = Date.now();
+
       const newRoom: Room = {
-        id: `room-${Date.now()}`,
+        id: `room-${now}`,
         name: roomName.trim(),
         isPublic,
         password: isPublic ? undefined : password.trim(),
@@ -61,20 +63,37 @@ export default function CreateRoomScreen({
             id: userId,
             name: userName,
             status: "idle",
+            todayStats: {
+              totalStudyTime: 0,
+              sessionsCompleted: 0,
+              lastActive: now,
+            }
           },
         ],
-        startedAt: new Date().toISOString(),
+        description: roomName.trim(),
+        ownerName: userName,
+        ownerId: userId,
+        startedAt: now,
+        category: 'General',
+        activityFeed: [],
+        messages: [],
+        leaderboard: {
+          daily: {},
+          weekly: [],
+          allTime: []
+        },
+        settings: {
+          maxMembers: 20,
+          allowChat: true,
+          allowReactions: true,
+        }
       };
 
       const updatedRooms = [...rooms, newRoom];
       await saveRooms(updatedRooms);
 
-      Alert.alert("Success", "Room created successfully!", [
-        {
-          text: "OK",
-          onPress: () => navigation.goBack(),
-        },
-      ]);
+      // Navigate to the newly created room
+      navigation.navigate('RoomSession', { roomId: newRoom.id });
     } catch (error) {
       Alert.alert("Error", "Failed to create room");
     } finally {

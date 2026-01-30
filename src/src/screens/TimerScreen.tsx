@@ -16,17 +16,9 @@ import * as Notifications from "expo-notifications";
 import { useTheme } from "../context/ThemeContext";
 import { useStudyTimer } from "../context/StudyTimerContext";
 import * as StorageService from "../services/storage";
-import { StudySession, Subject as ContextSubject } from "../types";
+import { StudySession, Subject } from "../types";
 
-type TimerMode = "focus" | "break";
 type TimerState = "idle" | "running" | "paused";
-
-interface Subject {
-  id: string;
-  name: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  color: string;
-}
 
 const DEFAULT_SUBJECTS: Subject[] = [
   { id: "math", name: "Math", icon: "calculator", color: "#5b9bd5" },
@@ -56,15 +48,6 @@ interface TimerScreenProps {
 export default function TimerScreen({ navigation }: TimerScreenProps) {
   const { colors } = useTheme();
   const studyTimer = useStudyTimer();
-
-  // Mode state (focus/break) - break mode is separate from StudyTimerContext
-  const [mode, setMode] = useState<TimerMode>("focus");
-  const [modeAnimation] = useState(new Animated.Value(0));
-
-  // Break mode state (only used when mode === "break")
-  const [breakState, setBreakState] = useState<TimerState>("idle");
-  const [breakSeconds, setBreakSeconds] = useState(0);
-  const [breakDuration, setBreakDuration] = useState(5 * 60); // Default: 5 minutes
 
   // UI state
   const [todayMinutes, setTodayMinutes] = useState(0);
@@ -99,15 +82,6 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
     }
   };
 
-  const loadBreakDuration = async () => {
-    try {
-      const settings = await StorageService.getUserSettings();
-      setBreakDuration(settings.breakDuration * 60); // Convert minutes to seconds
-    } catch (error) {
-      console.error("Error loading break duration:", error);
-    }
-  };
-
   const playCompletionSound = async () => {
     try {
       const settings = await StorageService.getUserSettings();
@@ -125,7 +99,6 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
     React.useCallback(() => {
       loadDailyGoal();
       loadTodayMinutes();
-      loadBreakDuration();
       loadRecentSessions();
     }, [])
   );
@@ -139,39 +112,16 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
 
   const loadRecentSessions = async () => {
     try {
-      const sessions = await AsyncStorage.getItem("studySessions");
-      if (sessions) {
-        const allSessions: StudySession[] = JSON.parse(sessions);
-        // Get last 5 sessions
-        setRecentSessions(allSessions.slice(-5).reverse());
-      }
+      const sessions = await StorageService.getRecentSessions(5);
+      setRecentSessions(sessions);
     } catch (error) {
       console.error("Error loading recent sessions:", error);
     }
   };
 
-  // Break mode timer (only runs when in break mode)
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (mode === "break" && breakState === "running") {
-      interval = setInterval(() => {
-        setBreakSeconds((s) => {
-          if (s <= 1) {
-            // Timer finished
-            setBreakState("idle");
-            playCompletionSound();
-            return 0;
-          }
-          return s - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [mode, breakState]);
-
   // Sync local subject with context subject when timer is running
   useEffect(() => {
-    if (mode === "focus" && studyTimer.currentSubject) {
+    if (studyTimer.currentSubject) {
       // Map context subject to local format
       const localSubject = DEFAULT_SUBJECTS.find(
         (s) => s.id === studyTimer.currentSubject?.id
@@ -180,31 +130,15 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
         setLocalSelectedSubject(localSubject);
       }
     }
-  }, [studyTimer.currentSubject, mode]);
+  }, [studyTimer.currentSubject]);
 
   // Sync context's showSubjectModal with local showSubjectPicker
   useEffect(() => {
-    if (mode === "focus" && studyTimer.showSubjectModal) {
+    if (studyTimer.showSubjectModal) {
       setShowSubjectPicker(true);
       studyTimer.setShowSubjectModal(false);
     }
-  }, [studyTimer.showSubjectModal, mode]);
-
-  useEffect(() => {
-    Animated.spring(modeAnimation, {
-      toValue: mode === "focus" ? 0 : 1,
-      useNativeDriver: false,
-      tension: 100,
-      friction: 10,
-    }).start();
-
-    // Reset break timer when switching to break mode
-    if (mode === "break") {
-      setBreakState("idle");
-      setBreakSeconds(breakDuration);
-    }
-    // Focus mode uses context timer, no need to reset
-  }, [mode, breakDuration]);
+  }, [studyTimer.showSubjectModal]);
 
   const formatTime = (totalSeconds: number) => {
     const h = Math.floor(totalSeconds / 3600);
@@ -217,44 +151,24 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
   };
 
   const handlePrimaryAction = () => {
-    if (mode === "focus") {
-      // Focus mode uses StudyTimerContext
-      const isIdle = !studyTimer.isRunning && !studyTimer.isPaused;
-      const isRunning = studyTimer.isRunning && !studyTimer.isPaused;
-      const isPaused = studyTimer.isPaused;
+    const isIdle = !studyTimer.isRunning && !studyTimer.isPaused;
+    const isRunning = studyTimer.isRunning && !studyTimer.isPaused;
+    const isPaused = studyTimer.isPaused;
 
-      if (isIdle) {
-        // Show subject modal before starting
-        studyTimer.setShowSubjectModal(true);
-      } else if (isRunning) {
-        studyTimer.pause();
-      } else if (isPaused) {
-        studyTimer.resume();
-      }
-    } else {
-      // Break mode uses local state
-      if (breakState === "idle") {
-        setBreakState("running");
-      } else if (breakState === "running") {
-        setBreakState("paused");
-      } else if (breakState === "paused") {
-        setBreakState("running");
-      }
+    if (isIdle) {
+      // Show subject modal before starting
+      studyTimer.setShowSubjectModal(true);
+    } else if (isRunning) {
+      studyTimer.pause();
+    } else if (isPaused) {
+      studyTimer.resume();
     }
   };
 
   const handleStop = async () => {
-    if (mode === "focus") {
-      // Focus mode: use context's stopAndSave (auto-saves)
-      await studyTimer.stopAndSave();
-      // Reload today's minutes and recent sessions
-      loadTodayMinutes();
-      loadRecentSessions();
-    } else {
-      // Break mode: just reset local state
-      setBreakState("idle");
-      setBreakSeconds(breakDuration);
-    }
+    await studyTimer.stopAndSave();
+    loadTodayMinutes();
+    loadRecentSessions();
   };
 
   const formatDuration = (seconds: number) => {
@@ -287,26 +201,18 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
 
   const progress = Math.min((todayMinutes / dailyGoal) * 100, 100);
 
-  // Get current timer state based on mode
+  // Get current timer state
   const getCurrentState = (): TimerState => {
-    if (mode === "focus") {
-      const isIdle = !studyTimer.isRunning && !studyTimer.isPaused;
-      const isRunning = studyTimer.isRunning && !studyTimer.isPaused;
-      if (isIdle) return "idle";
-      if (isRunning) return "running";
-      return "paused";
-    } else {
-      return breakState;
-    }
+    const isIdle = !studyTimer.isRunning && !studyTimer.isPaused;
+    const isRunning = studyTimer.isRunning && !studyTimer.isPaused;
+    if (isIdle) return "idle";
+    if (isRunning) return "running";
+    return "paused";
   };
 
-  // Get current timer seconds based on mode
+  // Get current timer seconds
   const getCurrentSeconds = (): number => {
-    if (mode === "focus") {
-      return Math.floor(studyTimer.elapsedMs / 1000);
-    } else {
-      return breakSeconds;
-    }
+    return Math.floor(studyTimer.elapsedMs / 1000);
   };
 
   const getButtonText = () => {
@@ -318,17 +224,9 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
 
   const getButtonColor = () => {
     const state = getCurrentState();
-    if (mode === "break") {
-      // Break mode uses green/teal colors
-      if (state === "idle") return "#34c759";
-      if (state === "running") return "#ff9500";
-      return "#34c759";
-    } else {
-      // Focus mode uses accent/standard colors
-      if (state === "idle") return colors.accent;
-      if (state === "running") return "#ff9500";
-      return "#34c759";
-    }
+    if (state === "idle") return colors.accent;
+    if (state === "running") return "#ff9500";
+    return "#34c759";
   };
 
   const getButtonIcon = () => {
@@ -340,60 +238,8 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
-        {/* Mode Selector */}
-        <View style={[styles.modeSelector, { backgroundColor: colors.card }]}>
-          <Animated.View
-            style={[
-              styles.modeSelectorIndicator,
-              { backgroundColor: colors.background },
-              {
-                left: modeAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ["2%", "50%"],
-                }),
-                right: modeAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ["50%", "2%"],
-                }),
-              },
-            ]}
-          />
-          <TouchableOpacity
-            style={styles.modeButton}
-            onPress={() => setMode("focus")}
-            activeOpacity={0.7}
-          >
-            <Text
-              style={[
-                styles.modeText,
-                {
-                  color: mode === "focus" ? colors.text : colors.textSecondary,
-                },
-              ]}
-            >
-              Focus
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.modeButton}
-            onPress={() => setMode("break")}
-            activeOpacity={0.7}
-          >
-            <Text
-              style={[
-                styles.modeText,
-                {
-                  color: mode === "break" ? colors.text : colors.textSecondary,
-                },
-              ]}
-            >
-              Break
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Focus Duration Selector (Only in Focus mode) */}
-        {mode === "focus" && (
+        {/* Focus Duration Selector */}
+        {(
           <TouchableOpacity
             style={[styles.durationButton, { backgroundColor: colors.card }]}
             onPress={() => setShowDurationPicker(true)}
@@ -416,17 +262,12 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
           <Text
             style={[
               styles.timerText,
-              { color: mode === "break" ? "#34c759" : colors.text },
+              { color: colors.text },
             ]}
           >
             {formatTime(getCurrentSeconds())}
           </Text>
-          {mode === "break" && getCurrentState() === "idle" && (
-            <Text style={[styles.breakHint, { color: colors.textSecondary }]}>
-              Take a {Math.floor(breakDuration / 60)} minute break
-            </Text>
-          )}
-          {mode === "focus" && getCurrentState() === "idle" && (
+          {getCurrentState() === "idle" && (
             <Text style={[styles.breakHint, { color: colors.textSecondary }]}>
               Ready to focus
             </Text>
@@ -460,8 +301,8 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
           )}
         </View>
 
-        {/* Subject Selector (Only in Focus mode) */}
-        {mode === "focus" && (
+        {/* Subject Selector */}
+        {(
           <View style={styles.subjectContainer}>
             <Text
               style={[styles.subjectLabel, { color: colors.textSecondary }]}
@@ -512,7 +353,7 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
         )}
 
         {/* Progress */}
-        {mode === "focus" && (
+        {(
           <View style={styles.progressContainer}>
             <View style={styles.progressHeader}>
               <Text
@@ -540,7 +381,7 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
         )}
 
         {/* Recent Sessions */}
-        {mode === "focus" && recentSessions.length > 0 && (
+        {recentSessions.length > 0 && (
           <View style={styles.historyContainer}>
             <TouchableOpacity
               style={styles.historyHeader}
@@ -724,7 +565,7 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
                     ]}
                     onPress={async () => {
                       // Convert local Subject to context Subject format
-                      const contextSubject: ContextSubject = {
+                      const contextSubject: Subject = {
                         id: subject.id,
                         name: subject.name,
                         icon: subject.icon,
@@ -734,7 +575,7 @@ export default function TimerScreen({ navigation }: TimerScreenProps) {
                       if (getCurrentState() === "idle") {
                         // Starting new timer: update local and will start with this subject
                         setLocalSelectedSubject(subject);
-                        studyTimer.startWithSubject(contextSubject);
+                        await studyTimer.startWithSubject(contextSubject);
                       } else {
                         // Timer running: change subject via context
                         await studyTimer.changeSubject(contextSubject);
@@ -794,36 +635,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 60,
     alignItems: "center",
-  },
-  modeSelector: {
-    width: "100%",
-    maxWidth: 400,
-    borderRadius: 25,
-    padding: 4,
-    flexDirection: "row",
-    position: "relative",
-  },
-  modeSelectorIndicator: {
-    position: "absolute",
-    top: 4,
-    bottom: 4,
-    borderRadius: 21,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  modeButton: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 10,
-  },
-  modeText: {
-    fontSize: 16,
-    fontWeight: "600",
   },
   durationButton: {
     flexDirection: "row",

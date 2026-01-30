@@ -60,7 +60,16 @@ export default function RoomsScreen() {
         ...room,
         members: [
           ...(room.members || []),
-          { id: userId, name: userName, status: 'idle' as const },
+          {
+            id: userId,
+            name: userName,
+            status: 'idle' as const,
+            todayStats: {
+              totalStudyTime: 0,
+              sessionsCompleted: 0,
+              lastActive: Date.now(),
+            }
+          },
         ],
         memberCount: (room.memberCount || 0) + 1,
       };

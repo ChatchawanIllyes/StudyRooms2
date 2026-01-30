@@ -10,6 +10,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState, AppStateStatus } from "react-native";
 import * as StorageService from "../services/storage";
 import { StudySession, Subject } from "../types";
+import { getUserId } from "../utils/roomsData";
+import { syncGlobalTimerToRooms } from "../services/roomsService";
 
 interface StudyTimerState {
   isRunning: boolean;
@@ -25,10 +27,10 @@ interface StudyTimerState {
 interface StudyTimerContextType extends StudyTimerState {
   start: () => void;
   pause: () => Promise<void>;
-  resume: () => void;
+  resume: () => Promise<void>;
   reset: () => void;
   stopAndSave: () => Promise<void>;
-  startWithSubject: (subject: Subject) => void;
+  startWithSubject: (subject: Subject) => Promise<void>;
   changeSubject: (subject: Subject) => Promise<void>;
   setShowSubjectModal: (show: boolean) => void;
 }
@@ -213,7 +215,7 @@ export function StudyTimerProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const startWithSubject = (subject: Subject) => {
+  const startWithSubject = async (subject: Subject) => {
     if (!isRunning && !isPaused) {
       const now = Date.now();
       setCurrentSubject(subject);
@@ -223,6 +225,14 @@ export function StudyTimerProvider({ children }: { children: ReactNode }) {
       setIsPaused(false);
       setAccumulatedMs(0);
       setShowSubjectModal(false);
+
+      // SYNC: Update all rooms user is in
+      try {
+        const userId = await getUserId();
+        await syncGlobalTimerToRooms(userId, true, subject.name, subject.id);
+      } catch (error) {
+        console.error('Failed to sync timer start to rooms:', error);
+      }
     }
   };
 
@@ -242,11 +252,19 @@ export function StudyTimerProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const resume = () => {
-    if (isPaused) {
+  const resume = async () => {
+    if (isPaused && currentSubject) {
       setSegmentStartedAt(Date.now());
       setIsRunning(true);
       setIsPaused(false);
+
+      // SYNC: Resume studying in all rooms
+      try {
+        const userId = await getUserId();
+        await syncGlobalTimerToRooms(userId, true, currentSubject.name, currentSubject.id);
+      } catch (error) {
+        console.error('Failed to sync resume to rooms:', error);
+      }
     }
   };
 
@@ -314,6 +332,15 @@ export function StudyTimerProvider({ children }: { children: ReactNode }) {
     // Only save if there's actual elapsed time
     if (elapsedMs === 0) {
       reset();
+
+      // SYNC: End session in all rooms even if elapsed is 0
+      try {
+        const userId = await getUserId();
+        await syncGlobalTimerToRooms(userId, false);
+      } catch (error) {
+        console.error('Failed to sync timer stop to rooms:', error);
+      }
+
       return;
     }
 
@@ -327,6 +354,14 @@ export function StudyTimerProvider({ children }: { children: ReactNode }) {
 
     // Save final session
     await savePartialSession(finalElapsed);
+
+    // SYNC: End session in all rooms
+    try {
+      const userId = await getUserId();
+      await syncGlobalTimerToRooms(userId, false);
+    } catch (error) {
+      console.error('Failed to sync timer stop to rooms:', error);
+    }
 
     // Reset everything
     reset();

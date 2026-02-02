@@ -12,7 +12,16 @@ import {
   RefreshControl,
   FlatList,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  withSpring,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Circle } from 'react-native-svg';
 import { useTheme } from '../context/ThemeContext';
 import { useStudyTimer } from '../context/StudyTimerContext';
 import {
@@ -59,10 +68,24 @@ export default function RoomSessionScreen({ navigation, route }: RoomSessionScre
   // UI state
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   const [showChatModal, setShowChatModal] = useState(false);
+  const [showInlineChat, setShowInlineChat] = useState(false);
   const [showSubjectPicker, setShowSubjectPicker] = useState(false);
   const [chatMessage, setChatMessage] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const [showAllActivity, setShowAllActivity] = useState(false);
+
+  // Animation values
+  const pulseAnim = useSharedValue(1);
+  const chatAnimation = useSharedValue(1000);
+
+  // Animated styles (must be at top level, not conditional)
+  const pulseAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseAnim.value }]
+  }));
+
+  const chatOverlayAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: chatAnimation.value }]
+  }));
 
   // Data state
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
@@ -78,6 +101,13 @@ export default function RoomSessionScreen({ navigation, route }: RoomSessionScre
   useEffect(() => {
     initializeRoom();
     loadSubjects();
+
+    // Start pulsing animation
+    pulseAnim.value = withRepeat(
+      withTiming(1.3, { duration: 1000 }),
+      -1,
+      true
+    );
 
     // Poll for updates every 5 seconds
     pollInterval.current = setInterval(() => {
@@ -213,8 +243,24 @@ export default function RoomSessionScreen({ navigation, route }: RoomSessionScre
   };
 
   const handleChatOpen = () => {
-    setShowChatModal(true);
+    setShowInlineChat(true);
     setUnreadCount(0);
+    chatAnimation.value = 1000;
+    chatAnimation.value = withSpring(0, {
+      damping: 20,
+      stiffness: 90,
+    });
+  };
+
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case 'session_start': return 'play-circle';
+      case 'session_end': return 'checkmark-circle';
+      case 'milestone': return 'trophy';
+      case 'join': return 'person-add';
+      case 'leave': return 'exit';
+      default: return 'ellipse';
+    }
   };
 
   const handleLeaveRoom = () => {
@@ -244,6 +290,7 @@ export default function RoomSessionScreen({ navigation, route }: RoomSessionScre
     const statusColor = getStatusColor(member.status);
     let statusText = 'Not studying';
     let activityText = '';
+    let progress = 0;
 
     if (member.status === 'studying' && member.currentSession) {
       statusText = 'Studying';
@@ -251,7 +298,11 @@ export default function RoomSessionScreen({ navigation, route }: RoomSessionScre
       const timerText = isCurrentUser && studyTimer.isRunning
         ? formatTime(Math.floor(studyTimer.elapsedMs / 1000))
         : formatTime(elapsed);
-      activityText = `${member.currentSession.subject} - ${timerText}`;
+      activityText = `${member.currentSession.subject}`;
+
+      // Calculate progress ring (full circle every 60 minutes)
+      const minutes = elapsed / 60;
+      progress = (minutes % 60) / 60 * 163; // 163 is circumference of r=26 circle
     }
 
     const todayTime = formatTime(member.todayStats.totalStudyTime);
@@ -265,31 +316,61 @@ export default function RoomSessionScreen({ navigation, route }: RoomSessionScre
           isCurrentUser && { borderColor: colors.accent, borderWidth: 2 }
         ]}
       >
-        {/* Header with colored dot and name */}
-        <View style={styles.memberHeader}>
+        {/* Avatar with progress ring */}
+        <View style={styles.avatarContainer}>
+          {member.status === 'studying' && member.currentSession && (
+            <Svg width="56" height="56" style={styles.progressRing}>
+              <Circle
+                cx="28"
+                cy="28"
+                r="26"
+                stroke={colors.accent}
+                strokeWidth="3"
+                fill="none"
+                strokeDasharray={`${progress} ${163 - progress}`}
+                rotation="-90"
+                origin="28, 28"
+              />
+            </Svg>
+          )}
           <View style={[styles.memberAvatar, { backgroundColor: `${colors.accent}40` }]}>
             <Text style={[styles.memberAvatarText, { color: colors.text }]}>
               {member.name.charAt(0).toUpperCase()}
             </Text>
           </View>
-          <View style={styles.memberInfo}>
-            <View style={styles.nameRow}>
-              <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-              <Text style={[styles.memberName, { color: colors.text }]} numberOfLines={1}>
-                {member.name}{isCurrentUser ? ' (You)' : ''}
-              </Text>
-            </View>
-          </View>
         </View>
+
+        {/* Status indicator (larger, 16x16) */}
+        <Animated.View
+          style={[
+            styles.statusDot,
+            { backgroundColor: statusColor },
+            member.status === 'studying' && pulseAnimatedStyle
+          ]}
+        />
+
+        {/* Member name */}
+        <Text style={[styles.memberName, { color: colors.text }]} numberOfLines={1}>
+          {member.name}{isCurrentUser ? ' (You)' : ''}
+        </Text>
 
         {/* Current activity */}
         <View style={styles.activitySection}>
-          <Text style={[styles.activityText, { color: colors.text }]} numberOfLines={1}>
+          <Text style={[styles.activityText, { color: colors.text }]} numberOfLines={2}>
             {activityText || statusText}
           </Text>
         </View>
 
-        {/* Today's total time only */}
+        {/* Timer text (if studying) */}
+        {member.status === 'studying' && member.currentSession && (
+          <Text style={[styles.timerText, { color: colors.accent }]}>
+            {isCurrentUser && studyTimer.isRunning
+              ? formatTime(Math.floor(studyTimer.elapsedMs / 1000))
+              : formatTime(member.currentSession.elapsedTime)}
+          </Text>
+        )}
+
+        {/* Today's total time */}
         <View style={styles.memberFooter}>
           <Text style={[styles.todayTime, { color: colors.textSecondary }]}>
             {todayTime} today
@@ -435,21 +516,64 @@ export default function RoomSessionScreen({ navigation, route }: RoomSessionScre
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
+      {/* Enhanced Header */}
       <View style={[styles.header, { backgroundColor: colors.card }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={28} color={colors.text} />
         </TouchableOpacity>
-        <View style={styles.headerInfo}>
+
+        <View style={styles.headerCenter}>
           <Text style={[styles.roomName, { color: colors.text }]} numberOfLines={1}>
             {room.name}
           </Text>
-          <Text style={[styles.roomMeta, { color: colors.textSecondary }]}>
-            {onlineCount}/{room.memberCount} active
-          </Text>
+          <View style={styles.statusPills}>
+            <View style={[styles.statusPill, { backgroundColor: colors.card }]}>
+              <Animated.View
+                style={[
+                  styles.statusIndicator,
+                  { backgroundColor: '#ff3b30' },
+                  pulseAnimatedStyle
+                ]}
+              />
+              <Text style={[styles.statusText, { color: colors.text }]}>
+                {onlineCount} studying now
+              </Text>
+            </View>
+          </View>
         </View>
+
         <TouchableOpacity onPress={handleLeaveRoom}>
-          <Ionicons name="exit-outline" size={24} color={colors.destructive} />
+          <Ionicons name="ellipsis-horizontal" size={24} color={colors.text} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Activity Ticker */}
+      <View style={[styles.activityTicker, { backgroundColor: colors.card }]}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tickerContent}
+        >
+          {activityFeed.slice(0, 5).map(activity => (
+            <TouchableOpacity
+              key={activity.id}
+              style={[styles.activityChip, { backgroundColor: colors.background }]}
+              onPress={() => setShowAllActivity(true)}
+            >
+              <Ionicons
+                name={getActivityIcon(activity.type) as any}
+                size={16}
+                color={colors.accent}
+              />
+              <Text style={[styles.activityChipText, { color: colors.text }]} numberOfLines={1}>
+                {activity.userName}: {getActivityDescription(activity)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <TouchableOpacity onPress={() => setShowAllActivity(!showAllActivity)}>
+          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
 
@@ -494,49 +618,90 @@ export default function RoomSessionScreen({ navigation, route }: RoomSessionScre
         </View>
       </ScrollView>
 
-      {/* Quick Actions Bar with Leaderboard */}
+      {/* Enhanced Action Bar */}
       <View style={[styles.actionBar, { backgroundColor: colors.card }]}>
         {!isStudying && (
           <TouchableOpacity
-            style={[styles.actionButton, styles.primaryButton, { backgroundColor: colors.accent }]}
+            style={[styles.primaryActionButton, { backgroundColor: colors.accent }]}
             onPress={handleStartStudying}
           >
             <Ionicons name="book" size={20} color="#ffffff" />
-            <Text style={styles.actionButtonText}>Study</Text>
+            <Text style={styles.primaryActionText}>Start Studying</Text>
           </TouchableOpacity>
         )}
 
         {isStudying && (
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: colors.destructive }]}
+            style={[styles.secondaryActionButton, { backgroundColor: colors.destructive }]}
             onPress={handleEndSession}
           >
             <Ionicons name="stop" size={18} color="#ffffff" />
-            <Text style={[styles.actionButtonText, { fontSize: 13 }]}>End</Text>
+            <Text style={styles.secondaryActionText}>End</Text>
           </TouchableOpacity>
         )}
 
-        {/* Leaderboard Button (square, in bottom bar) */}
+        {/* Leaderboard Button */}
         <TouchableOpacity
-          style={[styles.squareButton, { backgroundColor: colors.accent }]}
+          style={[styles.iconButton, { backgroundColor: colors.accent }]}
           onPress={() => setShowLeaderboardModal(true)}
         >
           <Ionicons name="trophy" size={20} color="#ffffff" />
         </TouchableOpacity>
+      </View>
 
-        {/* Chat Button */}
+      {/* Floating Chat Bubble */}
+      {!showInlineChat && (
         <TouchableOpacity
-          style={[styles.squareButton, { backgroundColor: colors.accent }]}
+          style={[styles.floatingChatBubble, { backgroundColor: colors.accent }]}
           onPress={handleChatOpen}
         >
-          <Ionicons name="chatbubbles" size={20} color="#ffffff" />
+          <Ionicons name="chatbubbles" size={24} color="#ffffff" />
           {unreadCount > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{unreadCount}</Text>
+            <View style={styles.chatBadge}>
+              <Text style={styles.chatBadgeText}>{unreadCount}</Text>
             </View>
           )}
         </TouchableOpacity>
-      </View>
+      )}
+
+      {/* Inline Chat Overlay */}
+      {showInlineChat && (
+        <Animated.View
+          style={[
+            styles.inlineChatOverlay,
+            { backgroundColor: colors.card },
+            chatOverlayAnimatedStyle
+          ]}
+        >
+          <View style={[styles.inlineChatHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.inlineChatTitle, { color: colors.text }]}>Chat</Text>
+            <TouchableOpacity onPress={() => setShowInlineChat(false)}>
+              <Ionicons name="close" size={24} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          <FlatList
+            ref={chatScrollRef}
+            data={chatMessages.slice(-10)}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => renderChatMessage(item)}
+            contentContainerStyle={styles.inlineChatMessages}
+          />
+
+          <View style={[styles.inlineChatInput, { borderTopColor: colors.border }]}>
+            <TextInput
+              style={[styles.chatTextInput, { color: colors.text, backgroundColor: colors.background }]}
+              placeholder="Type a message..."
+              placeholderTextColor={colors.textSecondary}
+              value={chatMessage}
+              onChangeText={setChatMessage}
+            />
+            <TouchableOpacity onPress={handleSendMessage} disabled={!chatMessage.trim()}>
+              <Ionicons name="send" size={20} color={colors.accent} />
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      )}
 
       {/* Leaderboard Modal (Bottom Sheet) */}
       <Modal visible={showLeaderboardModal} transparent animationType="slide">
@@ -650,22 +815,62 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingTop: 60,
+    paddingTop: 50,
+    gap: 12,
   },
-  backButton: {
-    padding: 4,
-  },
-  headerInfo: {
+  headerCenter: {
     flex: 1,
-    marginLeft: 12,
+    gap: 4,
   },
   roomName: {
     fontSize: 18,
     fontWeight: '600',
   },
-  roomMeta: {
-    fontSize: 14,
-    marginTop: 2,
+  statusPills: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  activityTicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  tickerContent: {
+    gap: 8,
+    paddingRight: 16,
+  },
+  activityChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    maxWidth: 200,
+  },
+  activityChipText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
   content: {
     flex: 1,
@@ -680,63 +885,70 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  // 4-Column Member Grid with taller cards (190px height)
+  // 3-Column Member Grid with larger cards (240px height)
   membersGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 12,
   },
   memberCard: {
-    width: '23.5%', // 4 per row with gaps
-    height: 190,
-    borderRadius: 12,
-    padding: 10,
+    width: '31%', // 3 per row with gaps
+    height: 240,
+    borderRadius: 16,
+    padding: 12,
     justifyContent: 'space-between',
-  },
-  memberHeader: {
     alignItems: 'center',
-    marginBottom: 6,
+  },
+  avatarContainer: {
+    position: 'relative',
+    alignSelf: 'center',
+    marginBottom: 8,
+  },
+  progressRing: {
+    position: 'absolute',
+    top: -2,
+    left: -2,
   },
   memberAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
   },
   memberAvatarText: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: '600',
-  },
-  memberInfo: {
-    alignItems: 'center',
-    width: '100%',
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    borderWidth: 2,
+    borderColor: '#ffffff',
   },
   memberName: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
+    paddingHorizontal: 4,
   },
   activitySection: {
     flex: 1,
     justifyContent: 'center',
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)',
+    alignItems: 'center',
+    paddingVertical: 8,
   },
   activityText: {
-    fontSize: 11,
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  timerText: {
+    fontSize: 16,
+    fontWeight: '600',
     textAlign: 'center',
   },
   memberFooter: {
@@ -744,6 +956,7 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     borderTopWidth: 1,
     borderTopColor: 'rgba(0,0,0,0.05)',
+    width: '100%',
   },
   todayTime: {
     fontSize: 11,
@@ -822,44 +1035,83 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
 
-  // Action Bar (smaller, cleaner buttons: 48px height)
+  // Enhanced Action Bar with Gradient
   actionBar: {
     flexDirection: 'row',
-    padding: 10,
-    gap: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)',
     alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingBottom: 32,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
   },
-  actionButton: {
+  primaryActionButton: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  primaryActionText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  secondaryActionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 48,
-    borderRadius: 12,
     gap: 6,
+    paddingVertical: 14,
+    borderRadius: 16,
   },
-  primaryButton: {
-    flex: 2,
-  },
-  actionButtonText: {
+  secondaryActionText: {
     color: '#ffffff',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
   },
-  squareButton: {
+  iconButton: {
     width: 48,
     height: 48,
-    borderRadius: 12,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  badge: {
+
+  // Floating Chat Bubble
+  floatingChatBubble: {
     position: 'absolute',
-    top: -2,
-    right: -2,
+    bottom: 100,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  chatBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
     backgroundColor: '#ff3b30',
     borderRadius: 10,
     minWidth: 20,
@@ -868,10 +1120,48 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 6,
   },
-  badgeText: {
+  chatBadgeText: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  // Inline Chat Overlay
+  inlineChatOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  inlineChatHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+  },
+  inlineChatTitle: {
+    fontSize: 18,
     fontWeight: '600',
+  },
+  inlineChatMessages: {
+    padding: 16,
+    gap: 12,
+  },
+  inlineChatInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderTopWidth: 1,
   },
 
   // Modal Styles
@@ -987,10 +1277,10 @@ const styles = StyleSheet.create({
   },
   chatTextInput: {
     flex: 1,
-    borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    maxHeight: 100,
+    borderRadius: 20,
+    fontSize: 15,
   },
   sendButton: {
     width: 44,

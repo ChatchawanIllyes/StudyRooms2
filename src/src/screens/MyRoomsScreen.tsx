@@ -8,14 +8,18 @@ import {
   Modal,
   ActivityIndicator,
   TextInput,
+  Dimensions,
 } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
+  withRepeat,
 } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
 import { useTheme } from "../context/ThemeContext";
 import {
   Room,
@@ -40,6 +44,7 @@ export default function MyRoomsScreen({ navigation }: MyRoomsScreenProps) {
   const [showActionButtons, setShowActionButtons] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const timeoutRefs = React.useRef<NodeJS.Timeout[]>([]);
 
   // Animation values
@@ -48,6 +53,16 @@ export default function MyRoomsScreen({ navigation }: MyRoomsScreenProps) {
   const button1TranslateY = useSharedValue(20);
   const button2Opacity = useSharedValue(0);
   const button2TranslateY = useSharedValue(20);
+  const pulseAnim = useSharedValue(1);
+
+  // Start pulsing animation
+  useEffect(() => {
+    pulseAnim.value = withRepeat(
+      withTiming(1.3, { duration: 1000 }),
+      -1,
+      true
+    );
+  }, []);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", () => {
@@ -72,6 +87,61 @@ export default function MyRoomsScreen({ navigation }: MyRoomsScreenProps) {
   const myRooms = rooms.filter((room) =>
     room.members?.some((m) => m.id === userId)
   );
+
+  // Filter rooms by search query
+  const filteredRooms = myRooms.filter((room) =>
+    room.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Calculate stats for hero card
+  const activeRooms = myRooms.filter(
+    (room) => room.members?.some((m) => m.status === "studying")
+  ).length;
+
+  const totalStudyTimeToday = myRooms.reduce((total, room) => {
+    const myMember = room.members?.find((m) => m.id === userId);
+    if (myMember?.currentSession) {
+      const sessionTime = Math.floor(
+        (Date.now() - new Date(myMember.currentSession.startTime).getTime()) / 1000
+      );
+      return total + sessionTime;
+    }
+    return total;
+  }, 0);
+
+  const streakDays = 5; // Placeholder - would calculate from actual data
+
+  // Helper function to get last activity description
+  const getLastActivity = (room: Room): string => {
+    const lastActivity = room.activityFeed?.[0];
+    if (!lastActivity) return "No recent activity";
+
+    const timeAgo = formatTimeAgo(lastActivity.timestamp);
+    switch (lastActivity.type) {
+      case "member_join":
+        return `${lastActivity.userName} joined ${timeAgo}`;
+      case "session_start":
+        return `${lastActivity.userName} started studying ${timeAgo}`;
+      case "session_end":
+        return `${lastActivity.userName} finished studying ${timeAgo}`;
+      case "milestone":
+        return `${lastActivity.userName} reached a milestone ${timeAgo}`;
+      case "rank_change":
+        return `${lastActivity.userName} rank changed ${timeAgo}`;
+      default:
+        return "Activity " + timeAgo;
+    }
+  };
+
+  // Format time in hours:minutes:seconds
+  const formatTime = (seconds: number): string => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+  };
 
   const handleRoomPress = (room: Room) => {
     // Navigate directly to room session
@@ -103,6 +173,9 @@ export default function MyRoomsScreen({ navigation }: MyRoomsScreenProps) {
   };
 
   const toggleActionButtons = () => {
+    // Add haptic feedback
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
     if (showActionButtons) {
       // Hide buttons
       rotation.value = withSpring(0);
@@ -147,6 +220,10 @@ export default function MyRoomsScreen({ navigation }: MyRoomsScreenProps) {
     transform: [{ translateY: button2TranslateY.value }],
   }));
 
+  const pulseAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseAnim.value }],
+  }));
+
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -167,82 +244,166 @@ export default function MyRoomsScreen({ navigation }: MyRoomsScreenProps) {
           {myRooms.length} room{myRooms.length !== 1 ? "s" : ""} joined
         </Text>
 
-        {myRooms.length > 0 ? (
-          <View style={styles.roomsList}>
-            {myRooms.map((room) => (
-              <TouchableOpacity
-                key={room.id}
-                style={[styles.roomCard, { backgroundColor: colors.card }]}
-                onPress={() => handleRoomPress(room)}
-                onLongPress={() => handleRoomLongPress(room)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.roomHeader}>
-                  <View style={styles.roomTitleRow}>
-                    <Text
-                      style={[styles.roomName, { color: colors.text }]}
-                      numberOfLines={1}
-                    >
-                      {room.name}
-                    </Text>
-                    {!room.isPublic && (
+        {myRooms.length > 0 && (
+          <>
+            {/* Hero Stats Card */}
+            <View style={[styles.heroCard, { borderColor: colors.border }]}>
+              <View style={styles.heroGradient}>
+                <View style={styles.heroContent}>
+                  <Text
+                    style={[styles.heroLabel, { color: colors.textSecondary }]}
+                  >
+                    TOTAL STUDY TIME TODAY
+                  </Text>
+                  <Text style={[styles.heroValue, { color: colors.text }]}>
+                    {formatTime(totalStudyTimeToday)}
+                  </Text>
+
+                  <View style={styles.heroStats}>
+                    <View style={styles.heroStatItem}>
                       <Ionicons
-                        name="lock-closed"
+                        name="people"
                         size={16}
                         color={colors.textSecondary}
                       />
-                    )}
-                  </View>
-                  <View style={styles.roomMeta}>
-                    <Ionicons
-                      name="people"
-                      size={14}
-                      color={colors.textSecondary}
-                    />
-                    <Text
-                      style={[
-                        styles.roomMetaText,
-                        { color: colors.textSecondary },
-                      ]}
-                    >
-                      {room.memberCount} members
-                    </Text>
+                      <Text
+                        style={[
+                          styles.heroStatText,
+                          { color: colors.textSecondary },
+                        ]}
+                      >
+                        {activeRooms} active room{activeRooms !== 1 ? "s" : ""}
+                      </Text>
+                    </View>
+                    <View style={styles.heroStatItem}>
+                      <Ionicons name="flame" size={16} color="#ff9500" />
+                      <Text
+                        style={[
+                          styles.heroStatText,
+                          { color: colors.textSecondary },
+                        ]}
+                      >
+                        {streakDays} day streak
+                      </Text>
+                    </View>
                   </View>
                 </View>
-                <View style={styles.roomFooter}>
-                  <View
-                    style={[
-                      styles.badge,
-                      {
-                        backgroundColor: room.isPublic
-                          ? "rgba(52, 199, 89, 0.1)"
-                          : colors.border,
-                      },
-                    ]}
+              </View>
+            </View>
+
+            {/* Search Bar */}
+            <View
+              style={[
+                styles.searchContainer,
+                { backgroundColor: colors.card },
+              ]}
+            >
+              <Ionicons
+                name="search"
+                size={20}
+                color={colors.textSecondary}
+              />
+              <TextInput
+                style={[styles.searchInput, { color: colors.text }]}
+                placeholder="Search rooms..."
+                placeholderTextColor={colors.textSecondary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery("")}>
+                  <Ionicons
+                    name="close-circle"
+                    size={20}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Rooms Grid */}
+            <View style={styles.roomsGrid}>
+              {filteredRooms.map((room) => {
+                const activeMembers =
+                  room.members?.filter((m) => m.status === "studying")
+                    .length || 0;
+
+                return (
+                  <TouchableOpacity
+                    key={room.id}
+                    style={[styles.roomCard, { borderColor: colors.border }]}
+                    onPress={() => handleRoomPress(room)}
+                    onLongPress={() => handleRoomLongPress(room)}
+                    activeOpacity={0.7}
                   >
-                    <Text
-                      style={[
-                        styles.badgeText,
-                        {
-                          color: room.isPublic
-                            ? "#34c759"
-                            : colors.textSecondary,
-                        },
-                      ]}
-                    >
-                      {room.isPublic ? "Public" : "Private"}
-                    </Text>
-                  </View>
-                  <Text
-                    style={[styles.timeText, { color: colors.textSecondary }]}
-                  >
-                    {formatTimeAgo(room.startedAt)}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        ) : (
+                    <View style={styles.cardGradient}>
+                      <View style={styles.roomHeader}>
+                        <View style={styles.roomTitleRow}>
+                          <Text
+                            style={[styles.roomName, { color: colors.text }]}
+                            numberOfLines={1}
+                          >
+                            {room.name}
+                          </Text>
+                          {!room.isPublic && (
+                            <Ionicons
+                              name="lock-closed"
+                              size={14}
+                              color={colors.textSecondary}
+                            />
+                          )}
+                        </View>
+                        <View style={styles.roomMeta}>
+                          <Ionicons
+                            name="people"
+                            size={12}
+                            color={colors.textSecondary}
+                          />
+                          <Text
+                            style={[
+                              styles.roomMetaText,
+                              { color: colors.textSecondary },
+                            ]}
+                          >
+                            {room.memberCount}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.roomFooter}>
+                        <View
+                          style={[
+                            styles.badge,
+                            {
+                              backgroundColor: room.isPublic
+                                ? "rgba(52, 199, 89, 0.1)"
+                                : colors.border,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.badgeText,
+                              {
+                                color: room.isPublic
+                                  ? "#34c759"
+                                  : colors.textSecondary,
+                              },
+                            ]}
+                          >
+                            {room.isPublic ? "Public" : "Private"}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
+
+        {myRooms.length === 0 && (
           <View style={styles.emptyState}>
             <Ionicons
               name="people-outline"
@@ -414,35 +575,89 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 24,
   },
-  roomsList: {
+  heroCard: {
+    marginBottom: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  heroGradient: {
+    padding: 20,
+  },
+  heroContent: {
+    gap: 8,
+  },
+  heroLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+  },
+  heroValue: {
+    fontSize: 36,
+    fontWeight: "200",
+    letterSpacing: -1,
+  },
+  heroStats: {
+    flexDirection: "row",
+    gap: 16,
+    marginTop: 8,
+  },
+  heroStatItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  heroStatText: {
+    fontSize: 13,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    marginBottom: 16,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+  },
+  roomsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
   },
   roomCard: {
+    width: "48%",
     borderRadius: 16,
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  cardGradient: {
     padding: 16,
-    marginBottom: 12,
   },
   roomHeader: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   roomTitleRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 8,
+    gap: 6,
+    marginBottom: 6,
   },
   roomName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "600",
     flex: 1,
   },
   roomMeta: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 4,
   },
   roomMetaText: {
-    fontSize: 14,
+    fontSize: 12,
   },
   roomFooter: {
     flexDirection: "row",

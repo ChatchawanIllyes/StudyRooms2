@@ -10,6 +10,7 @@ import {
   Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../context/ThemeContext";
 import {
   Room,
@@ -23,6 +24,15 @@ interface CreateRoomScreenProps {
   navigation: any;
 }
 
+const CATEGORIES = [
+  { id: 'general', name: 'General', icon: 'people', color: '#007AFF' },
+  { id: 'study', name: 'Study', icon: 'book', color: '#34C759' },
+  { id: 'work', name: 'Work', icon: 'briefcase', color: '#FF9500' },
+  { id: 'project', name: 'Project', icon: 'construct', color: '#FF3B30' },
+  { id: 'exam', name: 'Exam Prep', icon: 'school', color: '#5856D6' },
+  { id: 'focus', name: 'Deep Focus', icon: 'flash', color: '#AF52DE' },
+];
+
 export default function CreateRoomScreen({
   navigation,
 }: CreateRoomScreenProps) {
@@ -31,6 +41,7 @@ export default function CreateRoomScreen({
   const [isPublic, setIsPublic] = useState(true);
   const [password, setPassword] = useState("");
   const [creating, setCreating] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0]);
 
   const handleCreateRoom = async () => {
     if (!roomName.trim()) {
@@ -74,7 +85,7 @@ export default function CreateRoomScreen({
         ownerName: userName,
         ownerId: userId,
         startedAt: now,
-        category: 'General',
+        category: selectedCategory.name,
         activityFeed: [],
         messages: [],
         leaderboard: {
@@ -117,6 +128,48 @@ export default function CreateRoomScreen({
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
+        {/* Preview Card */}
+        {roomName.trim().length > 0 && (
+          <View style={[styles.previewCard, { borderColor: colors.border }]}>
+            <View style={styles.previewGradient}>
+              <View style={styles.previewHeader}>
+                <Ionicons
+                  name={selectedCategory.icon as any}
+                  size={24}
+                  color={selectedCategory.color}
+                />
+                <Text style={[styles.previewTitle, { color: colors.text }]}>
+                  {roomName}
+                </Text>
+              </View>
+              <View style={styles.previewMeta}>
+                <View
+                  style={[
+                    styles.previewBadge,
+                    {
+                      backgroundColor: isPublic
+                        ? "rgba(52, 199, 89, 0.1)"
+                        : colors.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.previewBadgeText,
+                      { color: isPublic ? "#34c759" : colors.textSecondary },
+                    ]}
+                  >
+                    {isPublic ? "Public" : "Private"}
+                  </Text>
+                </View>
+                <Text style={[styles.previewCategory, { color: colors.textSecondary }]}>
+                  {selectedCategory.name}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
         <View style={styles.section}>
           <Text style={[styles.label, { color: colors.textSecondary }]}>
             Room Name
@@ -136,6 +189,57 @@ export default function CreateRoomScreen({
             onChangeText={setRoomName}
             maxLength={50}
           />
+        </View>
+
+        {/* Category Picker */}
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            Category
+          </Text>
+          <View style={styles.categoryGrid}>
+            {CATEGORIES.map((category) => (
+              <TouchableOpacity
+                key={category.id}
+                style={[
+                  styles.categoryChip,
+                  {
+                    backgroundColor:
+                      selectedCategory.id === category.id
+                        ? category.color + "20"
+                        : colors.card,
+                    borderColor:
+                      selectedCategory.id === category.id
+                        ? category.color
+                        : colors.border,
+                  },
+                ]}
+                onPress={() => setSelectedCategory(category)}
+              >
+                <Ionicons
+                  name={category.icon as any}
+                  size={18}
+                  color={
+                    selectedCategory.id === category.id
+                      ? category.color
+                      : colors.textSecondary
+                  }
+                />
+                <Text
+                  style={[
+                    styles.categoryChipText,
+                    {
+                      color:
+                        selectedCategory.id === category.id
+                          ? category.color
+                          : colors.text,
+                    },
+                  ]}
+                >
+                  {category.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -233,6 +337,43 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
   },
+  previewCard: {
+    marginBottom: 24,
+    borderRadius: 20,
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  previewGradient: {
+    padding: 20,
+  },
+  previewHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 12,
+  },
+  previewTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    flex: 1,
+  },
+  previewMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  previewBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  previewBadgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  previewCategory: {
+    fontSize: 13,
+  },
   section: {
     marginBottom: 24,
   },
@@ -246,6 +387,24 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
+  },
+  categoryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  categoryChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 2,
+  },
+  categoryChipText: {
+    fontSize: 14,
+    fontWeight: "500",
   },
   switchRow: {
     flexDirection: "row",
@@ -264,9 +423,14 @@ const styles = StyleSheet.create({
   },
   createButton: {
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: "center",
     marginTop: 32,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   createButtonDisabled: {
     opacity: 0.6,

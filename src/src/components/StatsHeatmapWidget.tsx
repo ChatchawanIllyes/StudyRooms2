@@ -236,6 +236,7 @@ export default function StatsHeatmapWidget({
           </View>
 
           {/* GitHub-style grid: 7 rows (days), weeks as columns */}
+          {/* US Standard: Sunday=0, Monday=1, Tue=2, Wed=3, Thu=4, Fri=5, Sat=6 */}
           <View style={styles.githubGrid}>
             {[0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => (
               <View key={`day-${dayOfWeek}`} style={styles.githubRow}>
@@ -281,6 +282,7 @@ export default function StatsHeatmapWidget({
               ))}
             </View>
             <View style={styles.githubGrid}>
+              {/* US Standard: Sunday=0 through Saturday=6 */}
               {[0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => (
                 <View key={`top-day-${dayOfWeek}`} style={styles.githubRow}>
                   {weeksTop.map((week, weekIndex) => {
@@ -317,6 +319,7 @@ export default function StatsHeatmapWidget({
               ))}
             </View>
             <View style={styles.githubGrid}>
+              {/* US Standard: Sunday=0 through Saturday=6 */}
               {[0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => (
                 <View key={`middle-day-${dayOfWeek}`} style={styles.githubRow}>
                   {weeksMiddle.map((week, weekIndex) => {
@@ -353,6 +356,7 @@ export default function StatsHeatmapWidget({
               ))}
             </View>
             <View style={styles.githubGrid}>
+              {/* US Standard: Sunday=0 through Saturday=6 */}
               {[0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => (
                 <View key={`bottom-day-${dayOfWeek}`} style={styles.githubRow}>
                   {weeksBottom.map((week, weekIndex) => {
@@ -398,6 +402,7 @@ export default function StatsHeatmapWidget({
               ))}
             </View>
             <View style={styles.githubGrid}>
+              {/* US Standard: Sunday=0 through Saturday=6 */}
               {[0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => (
                 <View key={`top-day-${dayOfWeek}`} style={styles.githubRow}>
                   {weeksTop.map((week, weekIndex) => {
@@ -434,6 +439,7 @@ export default function StatsHeatmapWidget({
               ))}
             </View>
             <View style={styles.githubGrid}>
+              {/* US Standard: Sunday=0 through Saturday=6 */}
               {[0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => (
                 <View key={`bottom-day-${dayOfWeek}`} style={styles.githubRow}>
                   {weeksBottom.map((week, weekIndex) => {

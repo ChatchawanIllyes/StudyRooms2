@@ -278,6 +278,7 @@ export function formatDuration(minutes: number): string {
  * Organize dates into weeks (GitHub contribution graph style)
  * Returns array of weeks, where each week is an array of 7 dates (Sun-Sat)
  * Pads start/end with nulls to align to week boundaries
+ * Uses US standard (Sunday as first day of week)
  */
 export function organizeIntoWeeks(dates: Date[]): (Date | null)[][] {
   if (dates.length === 0) return [];

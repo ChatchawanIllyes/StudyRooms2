@@ -23,14 +23,14 @@ interface CalendarViewProps {
 }
 
 // Calculate cell width for 7-column grid with gaps
-// Screen width - horizontal padding - gaps between cells
+// Screen width - ScrollView padding (16px each side) - gaps between cells
 const SCREEN_WIDTH = Dimensions.get("window").width;
-const HORIZONTAL_PADDING = 32; // 16px on each side
+const SCROLL_PADDING = 32; // 16px on each side from scrollContent padding
 const GAP_SIZE = 4;
 const COLUMNS = 7;
-const TOTAL_GAP_WIDTH = (COLUMNS - 1) * GAP_SIZE;
-const AVAILABLE_WIDTH = SCREEN_WIDTH - HORIZONTAL_PADDING - TOTAL_GAP_WIDTH;
-const CELL_WIDTH = AVAILABLE_WIDTH / COLUMNS;
+const TOTAL_GAP_WIDTH = (COLUMNS - 1) * GAP_SIZE; // 6 gaps between 7 columns
+const AVAILABLE_WIDTH = SCREEN_WIDTH - SCROLL_PADDING - TOTAL_GAP_WIDTH;
+const CELL_WIDTH = Math.floor(AVAILABLE_WIDTH / COLUMNS); // Floor to prevent wrapping
 
 export default function CalendarView({
   sessions,
@@ -46,7 +46,7 @@ export default function CalendarView({
 
     // Get first day of month and its day of week
     const firstDay = new Date(year, month, 1);
-    const firstDayOfWeek = firstDay.getDay(); // 0 = Sunday
+    const firstDayOfWeek = firstDay.getDay(); // 0 = Sunday, 1 = Monday, etc.
 
     // Get last day of month
     const lastDay = new Date(year, month + 1, 0);

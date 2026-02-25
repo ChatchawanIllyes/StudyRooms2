@@ -5,6 +5,7 @@ import React, { useState, useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { StatusBar } from "expo-status-bar";
+import * as Font from "expo-font";
 import {
   View,
   Text,
@@ -123,6 +124,17 @@ function AppContent() {
 }
 
 export default function App() {
+  const [fontsLoaded, setFontsLoaded] = useState(false);
+
+  useEffect(() => {
+    Font.loadAsync({
+      PlayfairDisplay: require("../assets/fonts/PlayfairDisplay-Regular.ttf"),
+      PlayfairDisplayItalic: require("../assets/fonts/PlayfairDisplay-Italic.ttf"),
+    }).then(() => setFontsLoaded(true));
+  }, []);
+
+  if (!fontsLoaded) return null;
+
   return (
     <ThemeProvider>
       <WidgetProvider>

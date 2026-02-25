@@ -27,7 +27,7 @@ const COLOR_PALETTE = [
   { name: "Yellow", value: "#ffcc00" },
 ];
 
-export default function SettingsScreen() {
+export default function SettingsScreen({ navigation }: any) {
   const { colors, isDark, toggleDark, accentColor, setAccentColor } =
     useTheme();
   const [showColorPicker, setShowColorPicker] = useState(false);

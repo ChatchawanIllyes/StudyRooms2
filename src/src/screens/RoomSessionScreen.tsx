@@ -57,7 +57,7 @@ interface RoomSessionScreenProps {
 export default function RoomSessionScreen({ navigation, route }: RoomSessionScreenProps) {
   const { colors } = useTheme();
   const studyTimer = useStudyTimer();
-  const { roomId } = route.params;
+  const { roomId, openChat } = route.params;
 
   const [room, setRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
@@ -120,6 +120,13 @@ export default function RoomSessionScreen({ navigation, route }: RoomSessionScre
       }
     };
   }, [roomId]);
+
+  // Auto-open chat if navigated with openChat param
+  useEffect(() => {
+    if (openChat) {
+      handleChatOpen();
+    }
+  }, [openChat]);
 
   // CRITICAL: Sync timer with room member status (bidirectional)
   // This updates room status every second when studying (for smooth updates)
@@ -246,10 +253,18 @@ export default function RoomSessionScreen({ navigation, route }: RoomSessionScre
     setShowInlineChat(true);
     setUnreadCount(0);
     chatAnimation.value = 1000;
-    chatAnimation.value = withSpring(0, {
-      damping: 20,
-      stiffness: 90,
+    chatAnimation.value = withTiming(0, {
+      duration: 250,
     });
+  };
+
+  const handleChatClose = () => {
+    chatAnimation.value = withTiming(1000, {
+      duration: 200,
+    });
+    setTimeout(() => {
+      setShowInlineChat(false);
+    }, 200);
   };
 
   const getActivityIcon = (type: string) => {
@@ -675,7 +690,7 @@ export default function RoomSessionScreen({ navigation, route }: RoomSessionScre
         >
           <View style={[styles.inlineChatHeader, { borderBottomColor: colors.border }]}>
             <Text style={[styles.inlineChatTitle, { color: colors.text }]}>Chat</Text>
-            <TouchableOpacity onPress={() => setShowInlineChat(false)}>
+            <TouchableOpacity onPress={handleChatClose}>
               <Ionicons name="close" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
